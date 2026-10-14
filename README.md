@@ -19,8 +19,8 @@ A full-featured LMS for ICLCA built with **Next.js 15 (App Router)**, **PostgreS
 
 1. **Create a Postgres database.** In the Vercel dashboard: *Storage → Create → Neon (Postgres)* and connect it to the project. (Supabase or any Postgres works too.)
 2. **Set environment variables** (Project → Settings → Environment Variables):
-   - `DATABASE_URL` — pooled connection string
-   - `DIRECT_URL` — direct (non-pooled) connection string, used for migrations (Neon on Vercel provides `DATABASE_URL_UNPOOLED`; copy its value here)
+   - `DATABASE_URL` — pooled connection string (added automatically by the Neon integration)
+   - `DIRECT_URL` — optional: direct (non-pooled) connection used for migrations. If it's not set, the build uses `DATABASE_URL_UNPOOLED` (provided by the Neon integration) automatically.
    - `AUTH_SECRET` — a long random string (`openssl rand -base64 32`)
    - `ALLOW_SIGNUP` — optional; set to `false` so only admins can create accounts
    - `BLOB_READ_WRITE_TOKEN` — added automatically when you create a *Vercel Blob* store (Storage → Create → Blob). **Required for SCORM uploads in production**, and enables the "Upload" button for images/videos/files in the lesson editor. (Locally, without it, SCORM files are stored in `.data/scorm/`.)
