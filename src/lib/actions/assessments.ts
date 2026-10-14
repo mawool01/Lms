@@ -213,6 +213,17 @@ export async function deleteAssignment(assignmentId: string) {
   redirect(`/courses/${assignment.courseId}/assignments`);
 }
 
+const MAX_SUBMISSION_FILES = 10;
+
+/** Accepts only files this student uploaded to the submissions folder (Blob URL or /files/ path). */
+function isOwnSubmissionFile(url: string, userId: string) {
+  if (!isSafeUrl(url)) return false;
+  const { hostname, pathname } = new URL(url);
+  const path = decodeURIComponent(pathname);
+  if (hostname.endsWith(".blob.vercel-storage.com")) return path.startsWith(`/submissions/${userId}/`);
+  return path.startsWith(`/files/submissions/${userId}/`);
+}
+
 export async function submitAssignment(assignmentId: string, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const user = await requireUser();
   const assignment = await db.assignment.findUniqueOrThrow({ where: { id: assignmentId } });
@@ -220,14 +231,17 @@ export async function submitAssignment(assignmentId: string, _prev: ActionResult
   if (!isEnrolled || !assignment.published) return { error: "You can't submit to this assignment." };
   const content = String(formData.get("content") ?? "").trim();
   const linkUrl = String(formData.get("linkUrl") ?? "").trim() || null;
-  if (!content && !linkUrl) return { error: "Write a response or attach a link." };
+  const files = [...new Set(formData.getAll("files").map((f) => String(f).trim()).filter(Boolean))];
+  if (!content && !linkUrl && !files.length) return { error: "Write a response, attach a file or add a link." };
   if (linkUrl && !isSafeUrl(linkUrl)) return { error: "Please enter a valid http(s) link." };
+  if (files.length > MAX_SUBMISSION_FILES) return { error: `You can attach up to ${MAX_SUBMISSION_FILES} files.` };
+  if (files.some((f) => !isOwnSubmissionFile(f, user.id))) return { error: "One of the attached files couldn't be verified. Please upload it again." };
   const existing = await db.submission.findUnique({ where: { assignmentId_userId: { assignmentId, userId: user.id } } });
   if (existing?.grade != null) return { error: "This submission has already been graded." };
   await db.submission.upsert({
     where: { assignmentId_userId: { assignmentId, userId: user.id } },
-    update: { content, linkUrl, submittedAt: new Date() },
-    create: { assignmentId, userId: user.id, content, linkUrl },
+    update: { content, linkUrl, files, submittedAt: new Date() },
+    create: { assignmentId, userId: user.id, content, linkUrl, files },
   });
   await awardPoints(user.id, POINTS.assignmentSubmit, `Submitted “${assignment.title}”`, `assignment-submit:${assignmentId}`, assignment.courseId);
   if (assignment.dueAt && assignment.dueAt.getTime() - Date.now() >= 24 * 3600 * 1000) await awardBadge(user.id, "early-bird");

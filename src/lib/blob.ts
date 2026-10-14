@@ -51,9 +51,11 @@ export async function putBlob(pathname: string, body: Buffer, opts: { contentTyp
 }
 
 /** Config handed to client components for browser uploads, or null when storage isn't set up. */
-export function blobClientConfig(): { mode: BlobMode; access: BlobAccess } | null {
+export function blobClientConfig(): { mode: BlobMode | "local"; access: BlobAccess } | null {
   const mode = blobMode();
-  return mode ? { mode, access: blobAccess() } : null;
+  if (mode) return { mode, access: blobAccess() };
+  // Local development without Blob: store uploads on disk (Vercel's filesystem is read-only).
+  return process.env.VERCEL ? null : { mode: "local", access: "private" };
 }
 
 /** Remembers the access level a browser upload succeeded with. */

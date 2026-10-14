@@ -3,6 +3,8 @@ import { revalidatePath } from "next/cache";
 import { del, get } from "@vercel/blob";
 import { getCurrentUser } from "@/lib/auth";
 import { rememberAccess } from "@/lib/blob";
+import { localUploadPath, localUploadsEnabled } from "@/lib/local-files";
+import { readFile, rm } from "node:fs/promises";
 import { db } from "@/lib/db";
 import { importScormPackage, MAX_PACKAGE_BYTES, ScormImportError } from "@/lib/scorm/import";
 
@@ -30,11 +32,20 @@ export async function POST(req: Request) {
     if (!blobPathname || !blobPathname.startsWith("scorm-uploads/") || blobPathname.includes("..")) {
       return NextResponse.json({ error: "Invalid upload" }, { status: 400 });
     }
-    const access = body.blobAccess === "private" ? "private" : "public";
-    const file = await get(blobPathname, { access }).catch(() => null);
-    if (!file || file.statusCode !== 200) return NextResponse.json({ error: "Couldn't read the uploaded file" }, { status: 400 });
-    zip = new Uint8Array(await new Response(file.stream).arrayBuffer());
-    rememberAccess(access);
+    if (localUploadsEnabled()) {
+      // Development without Vercel Blob: the browser saved the zip under ./.data/uploads.
+      const local = localUploadPath(blobPathname);
+      const data = local ? await readFile(local).catch(() => null) : null;
+      if (!data) return NextResponse.json({ error: "Couldn't read the uploaded file" }, { status: 400 });
+      zip = new Uint8Array(data);
+      await rm(local!, { force: true });
+    } else {
+      const access = body.blobAccess === "private" ? "private" : "public";
+      const file = await get(blobPathname, { access }).catch(() => null);
+      if (!file || file.statusCode !== 200) return NextResponse.json({ error: "Couldn't read the uploaded file" }, { status: 400 });
+      zip = new Uint8Array(await new Response(file.stream).arrayBuffer());
+      rememberAccess(access);
+    }
   } else {
     opts = Object.fromEntries(url.searchParams);
     if (Number(req.headers.get("content-length") ?? 0) > MAX_PACKAGE_BYTES) return NextResponse.json({ error: "Package is larger than 500 MB." }, { status: 413 });
@@ -68,6 +79,6 @@ export async function POST(req: Request) {
     console.error("SCORM import failed", e);
     return NextResponse.json({ error: "Import failed. Please try again." }, { status: 500 });
   } finally {
-    if (blobPathname) await del(blobPathname).catch(() => {});
+    if (blobPathname && !localUploadsEnabled()) await del(blobPathname).catch(() => {});
   }
 }

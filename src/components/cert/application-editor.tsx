@@ -16,7 +16,9 @@ export function ApplicationEditor({
   criteria,
   initial,
   blob,
+  userId,
 }: {
+  userId: string;
   applicationId: string;
   kind: "INDIVIDUAL" | "CENTER";
   criteria: Criterion[];
@@ -106,6 +108,7 @@ export function ApplicationEditor({
                 evidence={r.evidence}
                 onChange={(evidence) => updateResponse(c.id, { evidence })}
                 blob={blob}
+                userId={userId}
               />
             </div>
           </div>
@@ -135,7 +138,7 @@ export function ApplicationEditor({
   );
 }
 
-function EvidenceList({ evidence, onChange, required, blob }: { evidence: string[]; onChange: (e: string[]) => void; required: boolean; blob: BlobClientConfig }) {
+function EvidenceList({ evidence, onChange, required, blob, userId }: { evidence: string[]; onChange: (e: string[]) => void; required: boolean; blob: BlobClientConfig; userId: string }) {
   const [link, setLink] = useState("");
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -152,7 +155,7 @@ function EvidenceList({ evidence, onChange, required, blob }: { evidence: string
     setError("");
     setUploading("0%");
     try {
-      const uploaded = await uploadToBlob(file, "cert-evidence", blob, (p) => setUploading(`${p}%`));
+      const uploaded = await uploadToBlob(file, "cert-evidence", blob, (p) => setUploading(`${p}%`), userId);
       onChange([...evidence, uploaded.url]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");

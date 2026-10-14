@@ -1,2 +1,5 @@
-/** What the browser needs to know to upload to Vercel Blob (safe to send to the client). */
-export type BlobClientConfig = { mode: "token" | "oidc"; access: "public" | "private" } | null;
+/**
+ * What the browser needs to know to upload files (safe to send to the client).
+ * "local" = development without Vercel Blob: files go to ./.data/uploads.
+ */
+export type BlobClientConfig = { mode: "token" | "oidc" | "local"; access: "public" | "private" } | null;

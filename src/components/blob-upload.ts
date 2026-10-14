@@ -12,12 +12,15 @@ export type UploadedFile = { url: string; pathname: string; access: "public" | "
  */
 export async function uploadToBlob(
   file: File,
-  folder: "uploads" | "scorm-uploads" | "cert-evidence",
+  folder: "uploads" | "scorm-uploads" | "cert-evidence" | "submissions",
   config: NonNullable<BlobClientConfig>,
   onProgress?: (percent: number) => void,
+  /** Required for per-user folders (submissions, cert-evidence): the uploader's user id. */
+  ownerId?: string,
 ): Promise<UploadedFile> {
   const safeName = file.name.replace(/[^\w.\-]+/g, "_") || "file";
-  const pathname = `${folder}/${crypto.randomUUID()}/${safeName}`;
+  const pathname = `${folder}/${ownerId ? `${ownerId}/` : ""}${crypto.randomUUID()}/${safeName}`;
+  if (config.mode === "local") return uploadLocally(pathname, file, onProgress);
   const attempt = (access: "public" | "private") => {
     const common = {
       access,
@@ -45,4 +48,18 @@ export async function uploadToBlob(
   }
   const url = access === "private" ? `${window.location.origin}/files/${blob.pathname}` : blob.url;
   return { url, pathname: blob.pathname, access };
+}
+
+/** Development fallback: send the file to this app, which saves it under ./.data/uploads. */
+async function uploadLocally(pathname: string, file: File, onProgress?: (percent: number) => void): Promise<UploadedFile> {
+  onProgress?.(0);
+  const res = await fetch(`/api/upload/local?pathname=${encodeURIComponent(pathname)}`, {
+    method: "POST",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error ?? "Upload failed");
+  onProgress?.(100);
+  return { url: `${window.location.origin}/files/${pathname}`, pathname, access: "private" };
 }

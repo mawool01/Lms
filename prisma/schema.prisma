@@ -220,6 +220,7 @@ model Submission {
   userId       String
   content      String
   linkUrl      String?
+  files        String[]   @default([]) // uploaded documents (Blob URLs or /files/… paths)
   grade        Int?
   feedback     String?
   gradedById   String?

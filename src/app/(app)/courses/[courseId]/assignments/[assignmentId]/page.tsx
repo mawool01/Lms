@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { requireCourseMember } from "@/lib/permissions";
 import { deleteAssignment, gradeSubmission, submitAssignment, updateAssignment } from "@/lib/actions/assessments";
 import { AssignmentForm } from "@/components/assess/assignment-form";
+import { SubmissionForm, SubmittedFiles } from "@/components/assess/submission-form";
+import { blobClientConfig } from "@/lib/blob";
 import { ActionForm, LocalTime, SubmitButton } from "@/components/forms";
 import { Markdown } from "@/components/markdown";
 import { Avatar, Card, Pill } from "@/components/ui";
@@ -55,6 +57,7 @@ export default async function AssignmentPage({ params }: { params: Promise<{ cou
                     <div className="space-y-3 border-t border-slate-100 p-4 dark:border-slate-800">
                       <p className="muted text-xs">Submitted <LocalTime date={sub.submittedAt} />{assignment.dueAt && sub.submittedAt > assignment.dueAt && <span className="ml-1 font-semibold text-red-600">(late)</span>}</p>
                       {sub.content && <div className="rounded-lg bg-slate-50 p-3 text-sm whitespace-pre-wrap dark:bg-slate-800/50">{sub.content}</div>}
+                      <SubmittedFiles files={sub.files} />
                       {sub.linkUrl && <a href={sub.linkUrl} target="_blank" rel="noopener noreferrer" className="link text-sm break-all">🔗 {sub.linkUrl}</a>}
                       <ActionForm action={gradeSubmission.bind(null, sub.id)} className="grid gap-2 sm:grid-cols-[120px_1fr_auto] sm:items-start">
                         <input name="grade" type="number" min={0} max={assignment.maxPoints} defaultValue={sub.grade ?? ""} placeholder={`/ ${assignment.maxPoints}`} aria-label="Grade" />
@@ -95,14 +98,17 @@ export default async function AssignmentPage({ params }: { params: Promise<{ cou
           {submission?.grade != null ? (
             <>
               {submission.content && <div className="rounded-lg bg-slate-50 p-3 text-sm whitespace-pre-wrap dark:bg-slate-800/50">{submission.content}</div>}
+              <div className="mt-2"><SubmittedFiles files={submission.files} /></div>
               {submission.linkUrl && <a href={submission.linkUrl} className="link mt-2 block text-sm break-all">🔗 {submission.linkUrl}</a>}
             </>
           ) : (
-            <ActionForm action={submitAssignment.bind(null, assignmentId)} className="space-y-3">
-              <textarea name="content" rows={8} defaultValue={submission?.content} placeholder="Type your response…" aria-label="Response" />
-              <input name="linkUrl" type="url" defaultValue={submission?.linkUrl ?? ""} placeholder="Link to your work (Google Doc, video, etc.) — optional" aria-label="Link" />
-              <SubmitButton pendingText="Submitting…">{submission ? "Update submission" : "Submit"}</SubmitButton>
-            </ActionForm>
+            <SubmissionForm
+              action={submitAssignment.bind(null, assignmentId)}
+              initial={{ content: submission?.content ?? "", linkUrl: submission?.linkUrl ?? null, files: submission?.files ?? [] }}
+              blob={blobClientConfig()}
+              userId={user.id}
+              isUpdate={!!submission}
+            />
           )}
         </Card>
       )}

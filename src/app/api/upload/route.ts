@@ -1,23 +1,14 @@
 import { NextResponse } from "next/server";
 import { handleUpload, handleUploadPresigned, type HandleUploadBody, type HandleUploadPresignedBody } from "@vercel/blob/client";
 import { issueSignedToken } from "@vercel/blob";
-import { getCurrentUser } from "@/lib/auth";
 import { blobMode } from "@/lib/blob";
-
-const MAX_BYTES = 500 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/*", "video/*", "audio/*", "application/pdf", "application/*", "text/*"];
-/** Browser uploads may only write under these folders. */
-const ALLOWED_PREFIXES = ["uploads/", "scorm-uploads/", "cert-evidence/"];
-
-async function requireUploader() {
-  const user = await getCurrentUser();
-  if (!user || user.role === "STUDENT") throw new Error("Only teachers and admins can upload files");
-}
+import { authorizeUpload } from "@/lib/upload-rules";
 
 /**
- * Lets teachers upload files directly from the browser to Vercel Blob
- * (bypassing the 4.5 MB serverless body limit). Supports both store types:
- * read-write token stores (client tokens) and OIDC stores (presigned URLs).
+ * Lets users upload files directly from the browser to Vercel Blob (bypassing
+ * the 4.5 MB serverless body limit). Who may upload what is decided per folder
+ * in src/lib/upload-rules.ts. Supports both store types: read-write token
+ * stores (client tokens) and OIDC stores (presigned URLs).
  */
 export async function POST(req: Request) {
   const body = await req.json();
@@ -27,9 +18,8 @@ export async function POST(req: Request) {
         body: body as HandleUploadBody,
         request: req,
         onBeforeGenerateToken: async (pathname) => {
-          await requireUploader();
-          if (!ALLOWED_PREFIXES.some((p) => pathname.startsWith(p))) throw new Error("Invalid upload path");
-          return { addRandomSuffix: true, maximumSizeInBytes: MAX_BYTES, allowedContentTypes: ALLOWED_TYPES };
+          const { rule } = await authorizeUpload(pathname);
+          return { addRandomSuffix: true, maximumSizeInBytes: rule.maxBytes, allowedContentTypes: rule.allowedContentTypes };
         },
         onUploadCompleted: async () => {},
       });
@@ -40,16 +30,15 @@ export async function POST(req: Request) {
         body: body as HandleUploadPresignedBody,
         request: req,
         getSignedToken: async (pathname) => {
-          await requireUploader();
-          if (!ALLOWED_PREFIXES.some((p) => pathname.startsWith(p)) || pathname.includes("..")) throw new Error("Invalid upload path");
+          const { rule } = await authorizeUpload(pathname);
           const token = await issueSignedToken({
             pathname,
             operations: ["put"],
-            maximumSizeInBytes: MAX_BYTES,
-            allowedContentTypes: ALLOWED_TYPES,
+            maximumSizeInBytes: rule.maxBytes,
+            allowedContentTypes: rule.allowedContentTypes,
             validUntil: Date.now() + 60 * 60 * 1000,
           });
-          return { token, urlOptions: { maximumSizeInBytes: MAX_BYTES, allowedContentTypes: ALLOWED_TYPES } };
+          return { token, urlOptions: { maximumSizeInBytes: rule.maxBytes, allowedContentTypes: rule.allowedContentTypes } };
         },
       });
       return NextResponse.json(json);

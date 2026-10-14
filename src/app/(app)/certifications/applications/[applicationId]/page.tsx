@@ -83,6 +83,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ ap
           criteria={criteria}
           initial={{ statement: app.statement, centerName: app.centerName, institution: app.institution, responses }}
           blob={blobClientConfig()}
+          userId={user.id}
         />
       ) : (
         <ApplicationResponses statement={app.statement} criteria={criteria} responses={responses} />
