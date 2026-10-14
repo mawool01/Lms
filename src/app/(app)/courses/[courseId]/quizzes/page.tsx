@@ -16,7 +16,7 @@ export default async function QuizzesPage({ params }: { params: Promise<{ course
     orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
     include: {
       _count: { select: { questions: true } },
-      attempts: { where: canManage ? {} : { userId: user.id }, select: { percent: true, passed: true, userId: true } },
+      attempts: { where: canManage ? {} : { userId: user.id }, select: { percent: true, passed: true, userId: true, needsGrading: true } },
     },
   });
 
@@ -25,8 +25,10 @@ export default async function QuizzesPage({ params }: { params: Promise<{ course
       <div className="space-y-3 lg:col-span-2">
         {quizzes.length === 0 && <EmptyState icon="📝" title="No quizzes yet" />}
         {quizzes.map((q) => {
-          const best = q.attempts.length ? Math.max(...q.attempts.map((a) => a.percent)) : null;
-          const avg = q.attempts.length ? Math.round(q.attempts.reduce((s, a) => s + a.percent, 0) / q.attempts.length) : null;
+          const graded = q.attempts.filter((a) => !a.needsGrading);
+          const pending = q.attempts.length - graded.length;
+          const best = graded.length ? Math.max(...graded.map((a) => a.percent)) : null;
+          const avg = graded.length ? Math.round(graded.reduce((s, a) => s + a.percent, 0) / graded.length) : null;
           const left = q.maxAttempts === 0 ? "Unlimited" : `${Math.max(0, q.maxAttempts - q.attempts.length)} left`;
           return (
             <Link key={q.id} href={`/courses/${courseId}/quizzes/${q.id}`} className="card flex items-center gap-4 p-4 transition hover:shadow-md">
@@ -45,12 +47,15 @@ export default async function QuizzesPage({ params }: { params: Promise<{ course
                   <>
                     <p className="font-semibold">{avg !== null ? `${avg}% avg` : "—"}</p>
                     <p className="muted text-xs">{new Set(q.attempts.map((a) => a.userId)).size} students attempted</p>
+                    {pending > 0 && <Pill tone="yellow">{pending} to grade</Pill>}
                   </>
                 ) : best !== null ? (
                   <>
                     <Pill tone={q.attempts.some((a) => a.passed) ? "green" : "red"}>Best {best}%</Pill>
                     <p className="muted mt-1 text-xs">{left}</p>
                   </>
+                ) : pending > 0 ? (
+                  <Pill tone="yellow">Awaiting grading</Pill>
                 ) : (
                   <Pill tone="brand">Not started</Pill>
                 )}

@@ -60,28 +60,30 @@ model User {
   institution  String?
   jobTitle     String?
 
-  coursesTaught    Course[]           @relation("CourseTeacher")
-  enrollments      Enrollment[]
-  completions      LessonCompletion[]
-  quizAttempts     QuizAttempt[]
-  submissions      Submission[]
-  pointEvents      PointEvent[]
-  badges           UserBadge[]
-  forumThreads     ForumThread[]
-  forumPosts       ForumPost[]
-  messagesSent     Message[]
-  participants     ConversationParticipant[]
-  announcements    Announcement[]
-  gradedSubmissions Submission[]      @relation("GradedBy")
-  scormUploads     ScormPackage[]
-  scormAttempts    ScormAttempt[]
-  certApplications CertApplication[]  @relation("CertApplicant")
-  certDecisions    CertApplication[]  @relation("CertDecider")
-  certReviews      CertReview[]
-  certMessages     CertMessage[]
-  certifications   Certification[]
-  portfolioItems   PortfolioItem[]     @relation("PortfolioOwner")
-  portfolioVerified PortfolioItem[]    @relation("PortfolioVerifier")
+  coursesTaught     Course[]                  @relation("CourseTeacher")
+  enrollments       Enrollment[]
+  completions       LessonCompletion[]
+  quizAttempts      QuizAttempt[]
+  submissions       Submission[]
+  pointEvents       PointEvent[]
+  badges            UserBadge[]
+  forumThreads      ForumThread[]
+  forumPosts        ForumPost[]
+  messagesSent      Message[]
+  participants      ConversationParticipant[]
+  announcements     Announcement[]
+  gradedSubmissions Submission[]              @relation("GradedBy")
+  scormUploads      ScormPackage[]
+  scormAttempts     ScormAttempt[]
+  certApplications  CertApplication[]         @relation("CertApplicant")
+  certDecisions     CertApplication[]         @relation("CertDecider")
+  certReviews       CertReview[]
+  certMessages      CertMessage[]
+  certifications    Certification[]
+  portfolioItems    PortfolioItem[]           @relation("PortfolioOwner")
+  portfolioVerified PortfolioItem[]           @relation("PortfolioVerifier")
+  rubrics           Rubric[]
+  checkResponses    KnowledgeCheckResponse[]
 }
 
 // ─── Courses & content ───────────────────────────────────────────────────────
@@ -121,12 +123,12 @@ model Enrollment {
 }
 
 model Module {
-  id       String   @id @default(cuid())
-  courseId String
-  title    String
-  position Int      @default(0)
-  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lessons  Lesson[]
+  id            String         @id @default(cuid())
+  courseId      String
+  title         String
+  position      Int            @default(0)
+  course        Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons       Lesson[]
   scormPackages ScormPackage[]
 
   @@index([courseId])
@@ -135,16 +137,17 @@ model Module {
 /// A lesson is an ordered list of content blocks (see src/lib/blocks.ts):
 /// text (markdown), image, video, chart, embed, file.
 model Lesson {
-  id          String             @id @default(cuid())
-  moduleId    String
-  title       String
-  position    Int                @default(0)
-  blocks      Json               @default("[]")
-  points      Int                @default(10)
-  module      Module             @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  completions LessonCompletion[]
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id             String                   @id @default(cuid())
+  moduleId       String
+  title          String
+  position       Int                      @default(0)
+  blocks         Json                     @default("[]")
+  points         Int                      @default(10)
+  module         Module                   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  completions    LessonCompletion[]
+  checkResponses KnowledgeCheckResponse[]
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
 
   @@index([moduleId])
 }
@@ -166,6 +169,7 @@ enum QuestionType {
   MULTIPLE_CHOICE
   TRUE_FALSE
   SHORT_ANSWER
+  ESSAY
 }
 
 model Quiz {
@@ -174,7 +178,7 @@ model Quiz {
   title        String
   description  String        @default("")
   passingScore Int           @default(70) // percent
-  maxAttempts  Int           @default(3)  // 0 = unlimited
+  maxAttempts  Int           @default(3) // 0 = unlimited
   weight       Int           @default(10) // weight in final course grade
   published    Boolean       @default(false)
   dueAt        DateTime?
@@ -192,26 +196,30 @@ model Question {
   type     QuestionType @default(MULTIPLE_CHOICE)
   prompt   String
   options  String[] // for MULTIPLE_CHOICE
-  answer   String // option index for MC, "true"/"false" for TF, accepted answers separated by | for short answer
+  answer   String // option index for MC, "true"/"false" for TF, accepted answers separated by | for short answer, guidance for essays
   points   Int          @default(1)
   position Int          @default(0)
+  rubricId String? // essays only
   quiz     Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  rubric   Rubric?      @relation(fields: [rubricId], references: [id], onDelete: SetNull)
 
   @@index([quizId])
 }
 
 model QuizAttempt {
-  id          String   @id @default(cuid())
-  quizId      String
-  userId      String
-  answers     Json // { [questionId]: string }
-  score       Int // points earned
-  maxScore    Int
-  percent     Float
-  passed      Boolean
-  submittedAt DateTime @default(now())
-  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  quizId       String
+  userId       String
+  answers      Json // { [questionId]: string }
+  score        Int // points earned
+  maxScore     Int
+  percent      Float
+  passed       Boolean
+  needsGrading Boolean   @default(false) // has essay answers a teacher hasn't scored yet
+  gradedAt     DateTime?
+  submittedAt  DateTime  @default(now())
+  quiz         Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([quizId, userId])
 }
@@ -225,7 +233,9 @@ model Assignment {
   weight      Int          @default(20)
   dueAt       DateTime?
   published   Boolean      @default(false)
+  rubricId    String?
   course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  rubric      Rubric?      @relation(fields: [rubricId], references: [id], onDelete: SetNull)
   submissions Submission[]
   createdAt   DateTime     @default(now())
 
@@ -241,6 +251,7 @@ model Submission {
   files        String[]   @default([]) // uploaded documents (Blob URLs or /files/… paths)
   grade        Int?
   feedback     String?
+  rubricScores Json? // RubricScores: rubric snapshot + selected level and comment per criterion
   gradedById   String?
   gradedAt     DateTime?
   submittedAt  DateTime   @default(now())
@@ -708,4 +719,42 @@ model SiteSettings {
   faviconUrl   String?
   updatedAt    DateTime @updatedAt
   updatedById  String?
+}
+
+// ─── Rubrics & knowledge checks ──────────────────────────────────────────────
+
+model Rubric {
+  id          String       @id @default(cuid())
+  ownerId     String
+  title       String
+  description String       @default("")
+  criteria    Json         @default("[]") // RubricCriterion[]
+  shared      Boolean      @default(false) // available to every teacher (set by admins)
+  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  assignments Assignment[]
+  questions   Question[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([ownerId])
+}
+
+/// One learner's practice answers to one knowledge-check question in a lesson.
+model KnowledgeCheckResponse {
+  id              String   @id @default(cuid())
+  userId          String
+  lessonId        String
+  blockId         String
+  questionId      String
+  attempts        Int      @default(0)
+  firstTryCorrect Boolean
+  correct         Boolean // latest answer
+  lastAnswer      String   @default("")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson          Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, lessonId, questionId])
+  @@index([lessonId])
 }

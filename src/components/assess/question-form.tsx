@@ -2,17 +2,20 @@
 
 import { useState } from "react";
 import { ActionForm, SubmitButton, type FormAction } from "@/components/forms";
+import { RubricSelect } from "@/components/assess/assignment-form";
 
-type QType = "MULTIPLE_CHOICE" | "TRUE_FALSE" | "SHORT_ANSWER";
+type QType = "MULTIPLE_CHOICE" | "TRUE_FALSE" | "SHORT_ANSWER" | "ESSAY";
 
 export function QuestionForm({
   action,
   initial,
   submitLabel,
+  rubrics,
 }: {
   action: FormAction;
-  initial?: { type: QType; prompt: string; options: string[]; answer: string; points: number };
+  initial?: { id?: string; type: QType; prompt: string; options: string[]; answer: string; points: number; rubricId: string | null };
   submitLabel: string;
+  rubrics: { id: string; label: string }[];
 }) {
   const [type, setType] = useState<QType>(initial?.type ?? "MULTIPLE_CHOICE");
   const [options, setOptions] = useState<string[]>(initial?.type === "MULTIPLE_CHOICE" ? initial.options : ["", "", "", ""]);
@@ -23,8 +26,9 @@ export function QuestionForm({
           <option value="MULTIPLE_CHOICE">Multiple choice</option>
           <option value="TRUE_FALSE">True / False</option>
           <option value="SHORT_ANSWER">Short answer</option>
+          <option value="ESSAY">Essay (teacher graded)</option>
         </select>
-        <input name="points" type="number" min={1} max={100} defaultValue={initial?.points ?? 1} className="sm:w-28" aria-label="Points" title="Points" />
+        <input name="points" type="number" min={1} max={1000} defaultValue={initial?.points ?? 1} className="sm:w-28" aria-label="Points" title="Points" />
       </div>
       <textarea name="prompt" rows={2} defaultValue={initial?.prompt} placeholder="Question text" aria-label="Question" required />
 
@@ -55,6 +59,15 @@ export function QuestionForm({
         <div className="field">
           <input name="accepted" defaultValue={initial?.type === "SHORT_ANSWER" ? initial.answer : ""} placeholder="Accepted answers, separated by |  e.g. photosynthesis | photo-synthesis" />
           <p className="muted text-xs">Matching ignores capitalization and extra spaces.</p>
+        </div>
+      )}
+      {type === "ESSAY" && (
+        <div className="space-y-3">
+          <div className="field">
+            <input name="guidance" defaultValue={initial?.type === "ESSAY" ? initial.answer : ""} placeholder="Guidance for learners (optional), e.g. Aim for 250–400 words and cite one source." aria-label="Essay guidance" />
+            <p className="muted text-xs">Essays are scored by a teacher after the attempt is submitted.</p>
+          </div>
+          <RubricSelect rubrics={rubrics} defaultValue={initial?.rubricId} id={`rubric-${initial?.id ?? "new"}`} />
         </div>
       )}
       <SubmitButton className="btn-primary btn-sm">{submitLabel}</SubmitButton>

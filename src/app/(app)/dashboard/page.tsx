@@ -160,10 +160,16 @@ async function StaffDashboard({ user }: { user: CurrentUser }) {
     take: 6,
   });
   const courseIds = (await db.course.findMany({ where: courseWhere, select: { id: true } })).map((c) => c.id);
-  const [toGrade, studentCount, userCounts, activity, recentThreads] = await Promise.all([
+  const [submissionsToGrade, essaysToGrade, studentCount, userCounts, activity, recentThreads] = await Promise.all([
     db.submission.findMany({
       where: { grade: null, assignment: { courseId: { in: courseIds } } },
       include: { user: { select: { name: true } }, assignment: { select: { id: true, title: true, courseId: true } } },
+      orderBy: { submittedAt: "asc" },
+      take: 8,
+    }),
+    db.quizAttempt.findMany({
+      where: { needsGrading: true, quiz: { courseId: { in: courseIds } } },
+      include: { user: { select: { name: true } }, quiz: { select: { id: true, title: true, courseId: true } } },
       orderBy: { submittedAt: "asc" },
       take: 8,
     }),
@@ -172,6 +178,10 @@ async function StaffDashboard({ user }: { user: CurrentUser }) {
     activitySeries(isAdmin ? {} : { courseIds }, 14),
     db.forumThread.findMany({ where: { courseId: { in: courseIds } }, include: { course: { select: { code: true } }, _count: { select: { posts: true } } }, orderBy: { updatedAt: "desc" }, take: 5 }),
   ]);
+  const toGrade = [
+    ...submissionsToGrade.map((s) => ({ id: s.id, title: s.assignment.title, href: `/courses/${s.assignment.courseId}/assignments/${s.assignment.id}`, name: s.user.name, at: s.submittedAt })),
+    ...essaysToGrade.map((a) => ({ id: a.id, title: `${a.quiz.title} (essay)`, href: `/courses/${a.quiz.courseId}/quizzes/${a.quiz.id}/attempts/${a.id}`, name: a.user.name, at: a.submittedAt })),
+  ].sort((a, b) => a.at.getTime() - b.at.getTime());
   const roleCount = (r: string) => userCounts.find((u) => u.role === r)?._count ?? 0;
 
   return (
@@ -218,8 +228,8 @@ async function StaffDashboard({ user }: { user: CurrentUser }) {
               <ul className="space-y-3">
                 {toGrade.map((s) => (
                   <li key={s.id}>
-                    <Link href={`/courses/${s.assignment.courseId}/assignments/${s.assignment.id}`} className="text-sm font-medium hover:underline">{s.assignment.title}</Link>
-                    <p className="muted text-xs">{s.user.name} · {timeAgo(s.submittedAt)}</p>
+                    <Link href={s.href} className="text-sm font-medium hover:underline">{s.title}</Link>
+                    <p className="muted text-xs">{s.name} · {timeAgo(s.at)}</p>
                   </li>
                 ))}
               </ul>

@@ -6,6 +6,8 @@ import { requireCourseMember } from "@/lib/permissions";
 import { submitQuiz, type AttemptAnswer } from "@/lib/actions/assessments";
 import { LocalTime, SubmitButton } from "@/components/forms";
 import { Avatar, Card, Pill, Stat } from "@/components/ui";
+import { toRubricData } from "@/lib/rubrics";
+import { RubricView } from "@/components/rubrics/rubric-view";
 
 export default async function QuizPage({ params, searchParams }: { params: Promise<{ courseId: string; quizId: string }>; searchParams: Promise<{ take?: string }> }) {
   const { courseId, quizId } = await params;
@@ -14,7 +16,7 @@ export default async function QuizPage({ params, searchParams }: { params: Promi
   const { canManage, isEnrolled } = await requireCourseMember(user, courseId);
   const quiz = await db.quiz.findUnique({
     where: { id: quizId },
-    include: { questions: { orderBy: [{ position: "asc" }, { id: "asc" }] } },
+    include: { questions: { orderBy: [{ position: "asc" }, { id: "asc" }], include: { rubric: true } } },
   });
   if (!quiz || quiz.courseId !== courseId || (!quiz.published && !canManage)) notFound();
 
@@ -23,7 +25,8 @@ export default async function QuizPage({ params, searchParams }: { params: Promi
   const attempts = await db.quizAttempt.findMany({ where: { quizId, userId: user.id }, orderBy: { submittedAt: "desc" } });
   const remaining = quiz.maxAttempts === 0 ? Infinity : quiz.maxAttempts - attempts.length;
   const canTake = isEnrolled && remaining > 0;
-  const best = attempts.length ? Math.max(...attempts.map((a) => a.percent)) : null;
+  const graded = attempts.filter((a) => !a.needsGrading);
+  const best = graded.length ? Math.max(...graded.map((a) => a.percent)) : null;
 
   if (take && canTake) {
     return (
@@ -56,6 +59,18 @@ export default async function QuizPage({ params, searchParams }: { params: Promi
               </div>
             )}
             {q.type === "SHORT_ANSWER" && <input name={`q_${q.id}`} placeholder="Your answer" autoComplete="off" required />}
+            {q.type === "ESSAY" && (
+              <div className="space-y-3">
+                {q.answer && <p className="muted text-sm">{q.answer}</p>}
+                <textarea name={`q_${q.id}`} rows={10} placeholder="Write your response…" aria-label={`Response to question ${i + 1}`} required />
+                {q.rubric && (
+                  <details className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                    <summary className="cursor-pointer text-sm font-medium">How this will be graded</summary>
+                    <div className="mt-2"><RubricView rubric={toRubricData(q.rubric)} compact /></div>
+                  </details>
+                )}
+              </div>
+            )}
           </fieldset>
         ))}
         <div className="flex justify-end">
@@ -74,7 +89,7 @@ export default async function QuizPage({ params, searchParams }: { params: Promi
           <Stat label="Questions" value={quiz.questions.length} />
           <Stat label="Pass mark" value={`${quiz.passingScore}%`} />
           <Stat label="Attempts left" value={remaining === Infinity ? "∞" : Math.max(0, remaining)} />
-          <Stat label="Best score" value={best !== null ? `${best}%` : "—"} />
+          <Stat label="Best score" value={best !== null ? `${best}%` : attempts.length ? "Awaiting grading" : "—"} />
         </div>
         {quiz.dueAt && <p className="muted mt-3 text-sm">Due <LocalTime date={quiz.dueAt} /></p>}
         {canTake ? (
@@ -90,7 +105,7 @@ export default async function QuizPage({ params, searchParams }: { params: Promi
               <li key={a.id} className="flex items-center justify-between py-2.5">
                 <span className="text-sm">Attempt {attempts.length - i} · <LocalTime date={a.submittedAt} /></span>
                 <Link href={`/courses/${courseId}/quizzes/${quizId}/attempts/${a.id}`} className="flex items-center gap-2">
-                  <Pill tone={a.passed ? "green" : "red"}>{a.percent}%</Pill>
+                  {a.needsGrading ? <Pill tone="yellow">Awaiting grading</Pill> : <Pill tone={a.passed ? "green" : "red"}>{a.percent}%</Pill>}
                   <span className="link text-sm">Review</span>
                 </Link>
               </li>
@@ -106,7 +121,7 @@ async function QuizResults({
   quiz,
   courseId,
 }: {
-  quiz: { id: string; title: string; published: boolean; passingScore: number; questions: { id: string; prompt: string }[] };
+  quiz: { id: string; title: string; published: boolean; passingScore: number; questions: { id: string; prompt: string; type: string; points: number }[] };
   courseId: string;
 }) {
   const attempts = await db.quizAttempt.findMany({
@@ -114,12 +129,18 @@ async function QuizResults({
     orderBy: { submittedAt: "desc" },
     include: { user: { select: { id: true, name: true, avatarUrl: true } } },
   });
-  const avg = attempts.length ? Math.round(attempts.reduce((s, a) => s + a.percent, 0) / attempts.length) : null;
-  const passRate = attempts.length ? Math.round((attempts.filter((a) => a.passed).length / attempts.length) * 100) : null;
+  const graded = attempts.filter((a) => !a.needsGrading);
+  const toGrade = attempts.length - graded.length;
+  const avg = graded.length ? Math.round(graded.reduce((s, a) => s + a.percent, 0) / graded.length) : null;
+  const passRate = graded.length ? Math.round((graded.filter((a) => a.passed).length / graded.length) * 100) : null;
   const questionStats = quiz.questions.map((q) => {
-    const answered = attempts.map((a) => (a.answers as Record<string, AttemptAnswer>)[q.id]).filter(Boolean);
-    const correct = answered.filter((x) => x.correct).length;
-    return { ...q, rate: answered.length ? Math.round((correct / answered.length) * 100) : null };
+    const answered = attempts.map((a) => (a.answers as Record<string, AttemptAnswer>)[q.id]).filter((x) => x && x.graded !== false);
+    // Essays: average share of points earned; other types: share answering correctly.
+    const rate =
+      q.type === "ESSAY"
+        ? answered.reduce((s, x) => s + x.earned / q.points, 0) / (answered.length || 1)
+        : answered.filter((x) => x.correct).length / (answered.length || 1);
+    return { ...q, rate: answered.length ? Math.round(rate * 100) : null };
   });
 
   return (
@@ -133,11 +154,11 @@ async function QuizResults({
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Questions" value={quiz.questions.length} />
-        <Stat label="Attempts" value={attempts.length} />
+        <Stat label="Attempts" value={attempts.length} hint={toGrade ? `${toGrade} need grading` : undefined} />
         <Stat label="Average" value={avg !== null ? `${avg}%` : "—"} />
         <Stat label="Pass rate" value={passRate !== null ? `${passRate}%` : "—"} />
       </div>
-      <Card title="Question difficulty" action={<span className="muted text-xs">% of attempts answering correctly</span>}>
+      <Card title="Question difficulty" action={<span className="muted text-xs">% of attempts answering correctly (essays: average score)</span>}>
         {questionStats.length === 0 ? (
           <p className="muted text-sm">No questions yet.</p>
         ) : (
@@ -145,7 +166,7 @@ async function QuizResults({
             {questionStats.map((q, i) => (
               <li key={q.id}>
                 <div className="mb-1 flex justify-between gap-3 text-sm">
-                  <span className="truncate">{i + 1}. {q.prompt}</span>
+                  <span className="truncate">{i + 1}. {q.prompt}{q.type === "ESSAY" && <span className="muted"> (essay)</span>}</span>
                   <span className={q.rate !== null && q.rate < 50 ? "font-semibold text-red-600" : "font-semibold"}>{q.rate !== null ? `${q.rate}%` : "—"}</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
@@ -168,8 +189,8 @@ async function QuizResults({
                   <tr key={a.id}>
                     <td><span className="flex items-center gap-2"><Avatar name={a.user.name} url={a.user.avatarUrl} size={24} />{a.user.name}</span></td>
                     <td className="muted"><LocalTime date={a.submittedAt} /></td>
-                    <td><Pill tone={a.passed ? "green" : "red"}>{a.percent}% ({a.score}/{a.maxScore})</Pill></td>
-                    <td><Link href={`/courses/${courseId}/quizzes/${quiz.id}/attempts/${a.id}`} className="link text-sm">Review</Link></td>
+                    <td>{a.needsGrading ? <Pill tone="yellow">Needs grading</Pill> : <Pill tone={a.passed ? "green" : "red"}>{a.percent}% ({a.score}/{a.maxScore})</Pill>}</td>
+                    <td><Link href={`/courses/${courseId}/quizzes/${quiz.id}/attempts/${a.id}`} className="link text-sm">{a.needsGrading ? "Grade" : "Review"}</Link></td>
                   </tr>
                 ))}
               </tbody>

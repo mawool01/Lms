@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { requireCourseMember } from "@/lib/permissions";
+import { rubricOptions } from "@/lib/rubric-access";
 import { createAssignment } from "@/lib/actions/assessments";
 import { AssignmentForm } from "@/components/assess/assignment-form";
 import { LocalTime } from "@/components/forms";
@@ -16,6 +17,7 @@ export default async function AssignmentsPage({ params }: { params: Promise<{ co
     orderBy: [{ dueAt: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
     include: { submissions: { where: canManage ? {} : { userId: user.id }, select: { grade: true } } },
   });
+  const rubrics = canManage ? await rubricOptions(user) : [];
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -53,7 +55,7 @@ export default async function AssignmentsPage({ params }: { params: Promise<{ co
       </div>
       {canManage && (
         <Card title="New assignment">
-          <AssignmentForm action={createAssignment.bind(null, courseId)} submitLabel="Create assignment" />
+          <AssignmentForm action={createAssignment.bind(null, courseId)} submitLabel="Create assignment" rubrics={rubrics} />
         </Card>
       )}
     </div>

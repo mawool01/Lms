@@ -10,6 +10,10 @@ import { blobClientConfig } from "@/lib/blob";
 import { ActionForm, LocalTime, SubmitButton } from "@/components/forms";
 import { Markdown } from "@/components/markdown";
 import { Avatar, Card, Pill } from "@/components/ui";
+import { loadRubric, rubricOptions } from "@/lib/rubric-access";
+import { isRubricScores } from "@/lib/rubrics";
+import { RubricView } from "@/components/rubrics/rubric-view";
+import { RubricGrader } from "@/components/rubrics/rubric-grader";
 
 export default async function AssignmentPage({ params }: { params: Promise<{ courseId: string; assignmentId: string }> }) {
   const { courseId, assignmentId } = await params;
@@ -17,6 +21,7 @@ export default async function AssignmentPage({ params }: { params: Promise<{ cou
   const { canManage, isEnrolled } = await requireCourseMember(user, courseId);
   const assignment = await db.assignment.findUnique({ where: { id: assignmentId } });
   if (!assignment || assignment.courseId !== courseId || (!assignment.published && !canManage)) notFound();
+  const rubric = await loadRubric(assignment.rubricId);
 
   const header = (
     <Card>
@@ -30,17 +35,25 @@ export default async function AssignmentPage({ params }: { params: Promise<{ cou
       {assignment.description ? <div className="mt-3"><Markdown>{assignment.description}</Markdown></div> : <p className="muted mt-2">No instructions.</p>}
     </Card>
   );
+  const rubricCard = rubric && (
+    <details className="card p-5" open={!canManage}>
+      <summary className="cursor-pointer font-semibold">How this will be graded</summary>
+      <div className="mt-3"><RubricView rubric={rubric} /></div>
+    </details>
+  );
 
   if (canManage) {
-    const [students, submissions] = await Promise.all([
+    const [students, submissions, rubrics] = await Promise.all([
       db.enrollment.findMany({ where: { courseId }, include: { user: { select: { id: true, name: true, avatarUrl: true } } }, orderBy: { user: { name: "asc" } } }),
       db.submission.findMany({ where: { assignmentId } }),
+      rubricOptions(user, assignment.rubricId),
     ]);
     const byUser = new Map(submissions.map((s) => [s.userId, s]));
     return (
       <div className="space-y-6">
         <Link href={`/courses/${courseId}/assignments`} className="link text-sm">← All assignments</Link>
         {header}
+        {rubricCard}
         <Card title={`Submissions (${submissions.length}/${students.length})`}>
           <div className="space-y-3">
             {students.length === 0 && <p className="muted text-sm">No students enrolled.</p>}
@@ -59,11 +72,25 @@ export default async function AssignmentPage({ params }: { params: Promise<{ cou
                       {sub.content && <div className="rounded-lg bg-slate-50 p-3 text-sm whitespace-pre-wrap dark:bg-slate-800/50">{sub.content}</div>}
                       <SubmittedFiles files={sub.files} />
                       {sub.linkUrl && <a href={sub.linkUrl} target="_blank" rel="noopener noreferrer" className="link text-sm break-all">🔗 {sub.linkUrl}</a>}
-                      <ActionForm action={gradeSubmission.bind(null, sub.id)} className="grid gap-2 sm:grid-cols-[120px_1fr_auto] sm:items-start">
-                        <input name="grade" type="number" min={0} max={assignment.maxPoints} defaultValue={sub.grade ?? ""} placeholder={`/ ${assignment.maxPoints}`} aria-label="Grade" />
-                        <textarea name="feedback" rows={2} defaultValue={sub.feedback ?? ""} placeholder="Feedback for the student" aria-label="Feedback" />
-                        <SubmitButton className="btn-primary">Save grade</SubmitButton>
-                      </ActionForm>
+                      {rubric ? (
+                        <ActionForm action={gradeSubmission.bind(null, sub.id)} className="space-y-2">
+                          <RubricGrader
+                            rubric={rubric}
+                            outOf={assignment.maxPoints}
+                            scoreName="grade"
+                            initialScore={sub.grade}
+                            initialSelections={isRubricScores(sub.rubricScores) && sub.rubricScores.rubric.id === rubric.id ? sub.rubricScores.selections : null}
+                          />
+                          <textarea name="feedback" rows={2} defaultValue={sub.feedback ?? ""} placeholder="Overall feedback for the student" aria-label="Feedback" />
+                          <SubmitButton className="btn-primary">Save grade</SubmitButton>
+                        </ActionForm>
+                      ) : (
+                        <ActionForm action={gradeSubmission.bind(null, sub.id)} className="grid gap-2 sm:grid-cols-[120px_1fr_auto] sm:items-start">
+                          <input name="grade" type="number" min={0} max={assignment.maxPoints} defaultValue={sub.grade ?? ""} placeholder={`/ ${assignment.maxPoints}`} aria-label="Grade" />
+                          <textarea name="feedback" rows={2} defaultValue={sub.feedback ?? ""} placeholder="Feedback for the student" aria-label="Feedback" />
+                          <SubmitButton className="btn-primary">Save grade</SubmitButton>
+                        </ActionForm>
+                      )}
                     </div>
                   )}
                 </details>
@@ -72,7 +99,7 @@ export default async function AssignmentPage({ params }: { params: Promise<{ cou
           </div>
         </Card>
         <Card title="Edit assignment">
-          <AssignmentForm action={updateAssignment.bind(null, assignmentId)} values={assignment} submitLabel="Save changes" />
+          <AssignmentForm action={updateAssignment.bind(null, assignmentId)} values={assignment} submitLabel="Save changes" rubrics={rubrics} />
           <form action={deleteAssignment.bind(null, assignmentId)} className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
             <button className="btn-ghost btn-sm text-red-600">Delete assignment</button>
           </form>
@@ -90,8 +117,14 @@ export default async function AssignmentPage({ params }: { params: Promise<{ cou
         <Card title="Your grade">
           <p className="text-3xl font-bold">{submission.grade}<span className="muted text-lg">/{assignment.maxPoints}</span></p>
           {submission.feedback && <div className="mt-3 rounded-lg bg-brand-50 p-3 text-sm whitespace-pre-wrap dark:bg-brand-950/50"><span className="font-semibold">Feedback: </span>{submission.feedback}</div>}
+          {isRubricScores(submission.rubricScores) && (
+            <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <RubricView rubric={submission.rubricScores.rubric} selections={submission.rubricScores.selections} />
+            </div>
+          )}
         </Card>
       )}
+      {submission?.grade == null && rubricCard}
       {isEnrolled && (
         <Card title={submission ? "Your submission" : "Submit your work"}>
           {submission && <p className="muted mb-3 text-xs">Last submitted <LocalTime date={submission.submittedAt} /></p>}

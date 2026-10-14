@@ -18,10 +18,17 @@ function newBlock(type: BlockType): Block {
     case "chart": return { id, type, chartType: "bar", title: "", data: "Month,Score\nJan,72\nFeb,80\nMar,86" };
     case "embed": return { id, type, url: "", height: 480 };
     case "file": return { id, type, url: "", name: "Download" };
+    case "check": return { id, type, title: "Knowledge check", questions: [newCheckQuestion("mc")] };
   }
 }
 
-const ICONS: Record<BlockType, string> = { text: "📝", callout: "💡", image: "🖼️", video: "🎬", chart: "📊", embed: "🧩", file: "📎" };
+type CheckQ = Extract<Block, { type: "check" }>["questions"][number];
+
+function newCheckQuestion(kind: CheckQ["kind"]): CheckQ {
+  return { id: crypto.randomUUID(), kind, prompt: "", options: kind === "mc" ? ["", "", ""] : [], answer: kind === "mc" ? "0" : kind === "tf" ? "true" : "", explanation: "" };
+}
+
+const ICONS: Record<BlockType, string> = { text: "📝", callout: "💡", image: "🖼️", video: "🎬", chart: "📊", embed: "🧩", file: "📎", check: "🧠" };
 
 export function LessonEditor({
   lessonId,
@@ -201,7 +208,86 @@ function BlockFields({ block, onChange, uploadsEnabled }: { block: Block; onChan
           <input value={block.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Link text" />
         </div>
       );
+    case "check":
+      return <CheckFields block={block} onChange={onChange} />;
   }
+}
+
+function CheckFields({ block, onChange }: { block: Extract<Block, { type: "check" }>; onChange: (patch: Partial<Block>) => void }) {
+  const setQuestions = (fn: (qs: CheckQ[]) => CheckQ[]) => onChange({ questions: fn(block.questions) });
+  const updateQ = (id: string, patch: Partial<CheckQ>) => setQuestions((qs) => qs.map((q) => (q.id === id ? { ...q, ...patch } : q)));
+  return (
+    <div className="space-y-3">
+      <input value={block.title} onChange={(e) => onChange({ title: e.target.value })} placeholder="Title, e.g. Check your understanding" aria-label="Knowledge check title" />
+      <p className="muted text-xs">Practice questions with instant feedback. Learners can retry as often as they like; nothing counts toward grades. You&apos;ll see class results on the lesson page.</p>
+      {block.questions.map((q, i) => (
+        <div key={q.id} className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700" data-testid="kc-editor-question">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold">Question {i + 1}</span>
+            <select
+              value={q.kind}
+              onChange={(e) => {
+                const kind = e.target.value as CheckQ["kind"];
+                updateQ(q.id, { ...newCheckQuestion(kind), id: q.id, prompt: q.prompt, explanation: q.explanation });
+              }}
+              className="w-44"
+              aria-label={`Question ${i + 1} type`}
+            >
+              <option value="mc">Multiple choice</option>
+              <option value="tf">True / False</option>
+              <option value="short">Short answer</option>
+            </select>
+            <span className="flex-1" />
+            {block.questions.length > 1 && (
+              <button type="button" className="btn-ghost btn-sm text-red-600" onClick={() => setQuestions((qs) => qs.filter((x) => x.id !== q.id))}>Remove</button>
+            )}
+          </div>
+          <textarea rows={2} value={q.prompt} onChange={(e) => updateQ(q.id, { prompt: e.target.value })} placeholder="Question" aria-label={`Question ${i + 1} text`} />
+          {q.kind === "mc" && (
+            <div className="space-y-1.5">
+              <p className="muted text-xs">Select the correct choice.</p>
+              {q.options.map((opt, oi) => (
+                <div key={oi} className="flex items-center gap-2">
+                  <input type="radio" name={`kc-correct-${q.id}`} checked={q.answer === String(oi)} onChange={() => updateQ(q.id, { answer: String(oi) })} aria-label={`Choice ${oi + 1} is correct`} />
+                  <input value={opt} onChange={(e) => updateQ(q.id, { options: q.options.map((o, j) => (j === oi ? e.target.value : o)) })} placeholder={`Choice ${oi + 1}`} aria-label={`Question ${i + 1} choice ${oi + 1}`} />
+                  {q.options.length > 2 && (
+                    <button
+                      type="button"
+                      className="btn-ghost btn-sm"
+                      aria-label="Remove choice"
+                      onClick={() => {
+                        const answer = Number(q.answer);
+                        updateQ(q.id, { options: q.options.filter((_, j) => j !== oi), answer: String(answer === oi ? 0 : answer > oi ? answer - 1 : answer) });
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+              {q.options.length < 8 && <button type="button" className="btn-ghost btn-sm" onClick={() => updateQ(q.id, { options: [...q.options, ""] })}>+ Add choice</button>}
+            </div>
+          )}
+          {q.kind === "tf" && (
+            <div className="flex gap-6 text-sm">
+              {["true", "false"].map((v) => (
+                <label key={v} className="flex items-center gap-2 font-normal capitalize">
+                  <input type="radio" name={`kc-tf-${q.id}`} checked={q.answer === v} onChange={() => updateQ(q.id, { answer: v })} /> {v}
+                </label>
+              ))}
+            </div>
+          )}
+          {q.kind === "short" && (
+            <input value={q.answer} onChange={(e) => updateQ(q.id, { answer: e.target.value })} placeholder="Accepted answers, separated by |" aria-label={`Question ${i + 1} accepted answers`} />
+          )}
+          <textarea rows={2} value={q.explanation} onChange={(e) => updateQ(q.id, { explanation: e.target.value })} placeholder="Explanation shown after answering (optional)" aria-label={`Question ${i + 1} explanation`} />
+        </div>
+      ))}
+      {block.questions.length < 30 && (
+        <button type="button" className="btn-secondary btn-sm" onClick={() => setQuestions((qs) => [...qs, newCheckQuestion("mc")])}>+ Add question</button>
+      )}
+    </div>
+  );
 }
 
 function UrlField({ value, onChange, placeholder, accept, uploadsEnabled }: { value: string; onChange: (v: string) => void; placeholder: string; accept?: string; uploadsEnabled: BlobClientConfig }) {

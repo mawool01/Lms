@@ -31,6 +31,7 @@ export function AppNav({
     { href: "/portfolio", label: "Portfolio", icon: "🗂️" },
     { href: "/profile", label: "Profile", icon: "👤" },
   ];
+  if (user.role !== "STUDENT") items.splice(3, 0, { href: "/rubrics", label: "Rubrics", icon: "📏" });
   if (user.role === "ADMIN") {
     items.push({ href: "/admin", label: "Admin", icon: "🛠️" });
   }

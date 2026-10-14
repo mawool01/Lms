@@ -7,6 +7,7 @@ import { parseBlocks } from "@/lib/blocks";
 import { toggleLessonComplete } from "@/lib/actions/courses";
 import { BlockRenderer } from "@/components/lesson/block-renderer";
 import { SubmitButton } from "@/components/forms";
+import type { CheckProgress, CheckStats } from "@/lib/knowledge-check";
 
 export default async function LessonPage({ params }: { params: Promise<{ courseId: string; lessonId: string }> }) {
   const { courseId, lessonId } = await params;
@@ -28,6 +29,36 @@ export default async function LessonPage({ params }: { params: Promise<{ courseI
   const next = ordered[index + 1];
   const blocks = parseBlocks(lesson.blocks);
 
+  // Knowledge checks: the learner's saved answers, and class results for teachers.
+  const checkQuestions = new Map(blocks.flatMap((b) => (b.type === "check" ? b.questions.map((q) => [q.id, q] as const) : [])));
+  let checkProgress: CheckProgress | undefined;
+  let checkStats: CheckStats | undefined;
+  if (checkQuestions.size) {
+    if (canManage) {
+      const [responses, enrolled] = await Promise.all([
+        db.knowledgeCheckResponse.findMany({ where: { lessonId }, select: { questionId: true, firstTryCorrect: true, correct: true, userId: true } }),
+        db.enrollment.findMany({ where: { courseId }, select: { userId: true } }),
+      ]);
+      const students = new Set(enrolled.map((e) => e.userId));
+      checkStats = Object.fromEntries([...checkQuestions.keys()].map((id) => [id, { learners: 0, firstTry: 0, correctNow: 0 }]));
+      for (const r of responses) {
+        const s = checkStats[r.questionId];
+        if (!s || !students.has(r.userId)) continue;
+        s.learners++;
+        if (r.firstTryCorrect) s.firstTry++;
+        if (r.correct) s.correctNow++;
+      }
+    } else {
+      const mine = await db.knowledgeCheckResponse.findMany({ where: { lessonId, userId: user.id, lastAnswer: { not: "" } } });
+      checkProgress = Object.fromEntries(
+        mine.flatMap((r) => {
+          const q = checkQuestions.get(r.questionId);
+          return q ? [[r.questionId, { value: r.lastAnswer, correct: r.correct, explanation: q.explanation }]] : [];
+        }),
+      );
+    }
+  }
+
   return (
     <article className="mx-auto max-w-3xl">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -39,7 +70,7 @@ export default async function LessonPage({ params }: { params: Promise<{ courseI
       </div>
 
       <div className="card p-5 sm:p-8">
-        {blocks.length === 0 ? <p className="muted italic">This lesson has no content yet.</p> : blocks.map((b) => <BlockRenderer key={b.id} block={b} />)}
+        {blocks.length === 0 ? <p className="muted italic">This lesson has no content yet.</p> : blocks.map((b) => <BlockRenderer key={b.id} block={b} lessonId={lessonId} checkProgress={checkProgress} checkStats={checkStats} />)}
       </div>
 
       {isEnrolled && (

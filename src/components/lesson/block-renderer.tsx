@@ -2,6 +2,8 @@ import type { Block } from "@/lib/blocks";
 import { embedUrl, isSafeUrl, videoEmbedUrl } from "@/lib/blocks";
 import { Markdown } from "@/components/markdown";
 import { ChartBlock } from "./chart-block";
+import { KnowledgeCheck } from "./knowledge-check";
+import { toPublicCheck, type CheckProgress, type CheckStats } from "@/lib/knowledge-check";
 
 const CALLOUT_STYLES = {
   info: { cls: "border-sky-300 bg-sky-50 dark:border-sky-800 dark:bg-sky-950/40", icon: "ℹ️" },
@@ -9,8 +11,28 @@ const CALLOUT_STYLES = {
   warning: { cls: "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40", icon: "⚠️" },
 };
 
-export function BlockRenderer({ block }: { block: Block }) {
+/**
+ * Renders one lesson block. Pass `lessonId` on the lesson page so knowledge checks are answered on the server
+ * (their answers never reach the browser); without it (editor preview) they are checked locally.
+ */
+export function BlockRenderer({
+  block,
+  lessonId,
+  checkProgress,
+  checkStats,
+}: {
+  block: Block;
+  lessonId?: string;
+  checkProgress?: CheckProgress;
+  checkStats?: CheckStats;
+}) {
   switch (block.type) {
+    case "check":
+      return lessonId ? (
+        <KnowledgeCheck block={toPublicCheck(block)} lessonId={lessonId} progress={checkProgress} stats={checkStats} />
+      ) : (
+        <KnowledgeCheck block={block} />
+      );
     case "text":
       return <Markdown>{block.markdown}</Markdown>;
     case "callout": {

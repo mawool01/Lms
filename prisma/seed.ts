@@ -65,6 +65,16 @@ async function main() {
             { id: id(), type: "text", markdown: "# The cell\nAll living things are made of **cells**. Some organisms are a single cell; you are made of about **37 trillion** of them.\n\n| Cell type | Has nucleus? | Example |\n|---|---|---|\n| Prokaryotic | No | Bacteria |\n| Eukaryotic | Yes | Plants, animals |" },
             { id: id(), type: "image", url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Animal_cell_structure_en.svg/800px-Animal_cell_structure_en.svg.png", caption: "Structure of a typical animal cell" },
             { id: id(), type: "callout", tone: "tip", markdown: "Remember: the **mitochondria** is the powerhouse of the cell!" },
+            {
+              id: id(),
+              type: "check",
+              title: "Check your understanding",
+              questions: [
+                { id: id(), kind: "mc", prompt: "Which type of cell has a nucleus?", options: ["Prokaryotic", "Eukaryotic", "Both"], answer: "1", explanation: "Eukaryotic cells (plants, animals, fungi) keep their DNA inside a nucleus. Prokaryotes such as bacteria don't have one." },
+                { id: id(), kind: "tf", prompt: "Bacteria are single-celled organisms.", options: [], answer: "true", explanation: "Bacteria are prokaryotes made of a single cell." },
+                { id: id(), kind: "short", prompt: "Which organelle is called the powerhouse of the cell?", options: [], answer: "mitochondria|mitochondrion", explanation: "Mitochondria release energy from food through cellular respiration." },
+              ],
+            },
           ],
         },
         {
@@ -142,9 +152,80 @@ async function main() {
       },
     },
   });
+  const labRubric = await db.rubric.create({
+    data: {
+      ownerId: tRivera.id,
+      title: "Lab report rubric",
+      description: "Used for all written lab reports in Biology.",
+      shared: true,
+      criteria: [
+        {
+          id: id(),
+          title: "Hypothesis",
+          description: "A clear, testable prediction.",
+          levels: [
+            { id: id(), label: "Exemplary", description: "Clear, testable and explains the reasoning.", points: 4 },
+            { id: id(), label: "Proficient", description: "Clear and testable.", points: 3 },
+            { id: id(), label: "Developing", description: "Present but vague.", points: 2 },
+            { id: id(), label: "Beginning", description: "Missing or not testable.", points: 1 },
+          ],
+        },
+        {
+          id: id(),
+          title: "Results & graph",
+          description: "Data is organized and graphed correctly.",
+          levels: [
+            { id: id(), label: "Exemplary", description: "Accurate, labelled graph with units and a trend line.", points: 4 },
+            { id: id(), label: "Proficient", description: "Accurate, labelled graph.", points: 3 },
+            { id: id(), label: "Developing", description: "Graph has errors or missing labels.", points: 2 },
+            { id: id(), label: "Beginning", description: "No graph.", points: 1 },
+          ],
+        },
+        {
+          id: id(),
+          title: "Conclusion",
+          description: "Uses evidence to accept or reject the hypothesis.",
+          levels: [
+            { id: id(), label: "Exemplary", description: "Uses data to justify the conclusion and suggests improvements.", points: 4 },
+            { id: id(), label: "Proficient", description: "Uses data to justify the conclusion.", points: 3 },
+            { id: id(), label: "Developing", description: "Conclusion not linked to data.", points: 2 },
+            { id: id(), label: "Beginning", description: "Missing.", points: 1 },
+          ],
+        },
+      ],
+    },
+  });
+  const essayRubric = await db.rubric.create({
+    data: {
+      ownerId: tRivera.id,
+      title: "Short essay",
+      criteria: [
+        { id: id(), title: "Accuracy", description: "", levels: [{ id: id(), label: "Accurate", description: "No science errors.", points: 3 }, { id: id(), label: "Mostly accurate", description: "Minor errors.", points: 2 }, { id: id(), label: "Inaccurate", description: "Major misconceptions.", points: 0 }] },
+        { id: id(), title: "Explanation", description: "", levels: [{ id: id(), label: "Thorough", description: "Explains why, with an example.", points: 3 }, { id: id(), label: "Partial", description: "Explains what, not why.", points: 2 }, { id: id(), label: "Minimal", description: "Restates the question.", points: 1 }] },
+      ],
+    },
+  });
+  await db.quiz.create({
+    data: {
+      courseId: bio.id,
+      title: "Photosynthesis reflection",
+      description: "One quick question and a short essay.",
+      published: true,
+      dueAt: daysFromNow(10),
+      weight: 10,
+      maxAttempts: 1,
+      questions: {
+        create: [
+          { type: "MULTIPLE_CHOICE", prompt: "Where in the cell does photosynthesis happen?", options: ["Mitochondria", "Chloroplast", "Nucleus"], answer: "1", points: 2, position: 0 },
+          { type: "ESSAY", prompt: "Explain why the rate of photosynthesis levels off at high light intensity.", options: [], answer: "Aim for 100–200 words.", points: 10, position: 1, rubricId: essayRubric.id },
+        ],
+      },
+    },
+  });
   const bioAssignment = await db.assignment.create({
     data: {
       courseId: bio.id,
+      rubricId: labRubric.id,
       title: "Lab report: Leaf disc experiment",
       description: "Write up your leaf disc photosynthesis experiment.\n\nInclude **hypothesis, method, results (with a graph) and conclusion**.",
       maxPoints: 50,

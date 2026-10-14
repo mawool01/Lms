@@ -35,7 +35,7 @@ export async function courseReports(courseId: string, userIds: string[]): Promis
     db.lesson.findMany({ where: { module: { courseId } }, select: { id: true } }),
     db.quizAttempt.findMany({
       where: { quiz: { courseId }, userId: { in: userIds } },
-      select: { quizId: true, userId: true, percent: true, submittedAt: true },
+      select: { quizId: true, userId: true, percent: true, submittedAt: true, needsGrading: true },
     }),
     db.submission.findMany({
       where: { assignment: { courseId }, userId: { in: userIds } },
@@ -61,8 +61,11 @@ export async function courseReports(courseId: string, userIds: string[]): Promis
     const items: GradeItem[] = [];
     for (const q of quizzes) {
       const mine = attempts.filter((a) => a.quizId === q.id && a.userId === userId);
-      const best = mine.length ? Math.max(...mine.map((a) => a.percent)) : null;
-      items.push({ id: q.id, kind: "quiz", title: q.title, weight: q.weight, dueAt: q.dueAt, percent: best, status: best === null ? "not-started" : "graded" });
+      // Attempts with essays awaiting a teacher don't count until they're graded.
+      const graded = mine.filter((a) => !a.needsGrading);
+      const best = graded.length ? Math.max(...graded.map((a) => a.percent)) : null;
+      const status = best !== null ? "graded" : mine.length ? "submitted" : "not-started";
+      items.push({ id: q.id, kind: "quiz", title: q.title, weight: q.weight, dueAt: q.dueAt, percent: best, status });
     }
     for (const a of assignments) {
       const sub = submissions.find((s) => s.assignmentId === a.id && s.userId === userId);

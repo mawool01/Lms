@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { checkProblem, isCorrect, type CheckResult } from "@/lib/knowledge-check";
 import { db } from "@/lib/db";
 import { requireRole, requireUser } from "@/lib/auth";
 import { getCourseAccess, requireCourseManager, requireCourseMember } from "@/lib/permissions";
-import { blocksSchema, isSafeUrl } from "@/lib/blocks";
+import { blocksSchema, isSafeUrl, parseBlocks } from "@/lib/blocks";
 import { onLessonCompleted } from "@/lib/gamification";
 import type { ActionResult } from "@/lib/action-types";
 
@@ -185,6 +186,10 @@ export async function saveLesson(lessonId: string, input: { title: string; point
   if (!blocks.success) return { error: "Some content blocks are invalid." };
   for (const b of blocks.data) {
     if ("url" in b && b.url && !isSafeUrl(b.url)) return { error: `Invalid URL in ${b.type} block: ${b.url}` };
+    if (b.type === "check") {
+      const problem = checkProblem(b);
+      if (problem) return { error: problem };
+    }
   }
   const title = input.title.trim();
   if (!title) return { error: "Lesson title is required." };
@@ -256,4 +261,33 @@ export async function deleteAnnouncement(id: string) {
   await requireCourseManager(user, a.courseId);
   await db.announcement.delete({ where: { id } });
   revalidatePath(`/courses/${a.courseId}`);
+}
+
+// ─── Knowledge checks ────────────────────────────────────────────────────────
+
+/** Checks one practice answer. Enrolled learners' answers are recorded for the teacher's class results. */
+export async function answerKnowledgeCheck(lessonId: string, blockId: string, questionId: string, value: string): Promise<CheckResult | { error: string }> {
+  const user = await requireUser();
+  const lesson = await db.lesson.findUnique({ where: { id: lessonId }, include: { module: { select: { courseId: true } } } });
+  if (!lesson) return { error: "Lesson not found." };
+  const { isEnrolled } = await requireCourseMember(user, lesson.module.courseId);
+  const block = parseBlocks(lesson.blocks).find((b) => b.id === blockId);
+  const question = block?.type === "check" ? block.questions.find((q) => q.id === questionId) : undefined;
+  if (!question) return { error: "This question was changed. Reload the page to see the latest version." };
+  const answer = String(value ?? "").slice(0, 1000);
+  const correct = isCorrect(question, answer);
+  if (isEnrolled) {
+    await db.knowledgeCheckResponse.upsert({
+      where: { userId_lessonId_questionId: { userId: user.id, lessonId, questionId } },
+      create: { userId: user.id, lessonId, blockId, questionId, attempts: 1, firstTryCorrect: correct, correct, lastAnswer: answer },
+      update: { attempts: { increment: 1 }, correct, lastAnswer: answer, blockId },
+    });
+  }
+  return { correct, explanation: question.explanation };
+}
+
+/** Forgets a learner's answers to one knowledge check so they can start over (first-try results are kept for teachers). */
+export async function resetKnowledgeCheck(lessonId: string, blockId: string) {
+  const user = await requireUser();
+  await db.knowledgeCheckResponse.updateMany({ where: { userId: user.id, lessonId, blockId }, data: { lastAnswer: "" } });
 }

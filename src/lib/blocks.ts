@@ -16,6 +16,24 @@ export const blockSchema = z.discriminatedUnion("type", [
   z.object({ id: z.string(), type: z.literal("embed"), url: z.string(), height: z.number().default(480) }),
   z.object({ id: z.string(), type: z.literal("file"), url: z.string(), name: z.string().default("Download") }),
   z.object({ id: z.string(), type: z.literal("callout"), tone: z.enum(["info", "tip", "warning"]), markdown: z.string() }),
+  z.object({
+    id: z.string(),
+    type: z.literal("check"),
+    title: z.string().default("Knowledge check"),
+    questions: z
+      .array(
+        z.object({
+          id: z.string(),
+          kind: z.enum(["mc", "tf", "short"]),
+          prompt: z.string(),
+          options: z.array(z.string()).default([]),
+          // mc: index of the correct option; tf: "true"/"false"; short: accepted answers separated by |
+          answer: z.string(),
+          explanation: z.string().default(""),
+        }),
+      )
+      .max(30),
+  }),
 ]);
 
 export type Block = z.infer<typeof blockSchema>;
@@ -35,6 +53,7 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
   embed: "Embed",
   file: "File / Link",
   callout: "Callout",
+  check: "Knowledge check",
 };
 
 /** Parses chart CSV text into recharts rows + series names. */
