@@ -89,3 +89,57 @@ export function isSafeUrl(url: string) {
     return false;
   }
 }
+
+/**
+ * Converts share/edit links from services that refuse to be framed into their
+ * embeddable form (e.g. Google Slides ".../edit" → ".../embed"). Other URLs pass through.
+ */
+export function embedUrl(url: string): string {
+  let u: URL;
+  try {
+    u = new URL(url.trim());
+  } catch {
+    return url;
+  }
+  const host = u.hostname.replace(/^www\./, "");
+
+  if (host === "docs.google.com") {
+    // Already published to the web ("/pub", "/pubhtml") or an embed link: keep, but make sure Slides use /embed.
+    const published = /\/d\/e\/([^/]+)/.exec(u.pathname);
+    if (published) {
+      const id = published[1];
+      if (u.pathname.startsWith("/presentation/")) {
+        // Keep the publisher's settings (start, loop, delayms); default to not auto-starting.
+        const params = new URLSearchParams(u.search);
+        if (!params.has("start")) params.set("start", "false");
+        return `https://docs.google.com/presentation/d/e/${id}/embed?${params}`;
+      }
+      if (u.pathname.startsWith("/forms/")) return `https://docs.google.com/forms/d/e/${id}/viewform?embedded=true`;
+      if (u.pathname.startsWith("/spreadsheets/")) return `https://docs.google.com/spreadsheets/d/e/${id}/pubhtml?widget=true&headers=false`;
+      if (u.pathname.startsWith("/document/")) return `https://docs.google.com/document/d/e/${id}/pub?embedded=true`;
+      return url;
+    }
+    const m = /^\/(presentation|document|spreadsheets|forms|drawings)\/d\/([^/]+)/.exec(u.pathname);
+    if (m) {
+      const [, kind, id] = m;
+      if (kind === "presentation") return `https://docs.google.com/presentation/d/${id}/embed?start=false&loop=false`;
+      if (kind === "forms") return `https://docs.google.com/forms/d/${id}/viewform?embedded=true`;
+      if (kind === "drawings") return `https://docs.google.com/drawings/d/${id}/preview`;
+      const gid = u.hash.match(/gid=(\d+)/)?.[1] ?? u.searchParams.get("gid");
+      return `https://docs.google.com/${kind}/d/${id}/preview${kind === "spreadsheets" && gid ? `?gid=${gid}` : ""}`;
+    }
+  }
+  if (host === "drive.google.com") {
+    const id = /\/file\/d\/([^/]+)/.exec(u.pathname)?.[1] ?? u.searchParams.get("id");
+    if (id) return `https://drive.google.com/file/d/${id}/preview`;
+  }
+  if (host === "canva.com") {
+    // Canva share links embed with ?embed
+    if (/\/design\//.test(u.pathname) && !u.searchParams.has("embed")) {
+      u.pathname = u.pathname.replace(/\/(edit|view)\/?$/, "/view");
+      u.searchParams.set("embed", "");
+      return u.toString().replace("embed=", "embed");
+    }
+  }
+  return url;
+}

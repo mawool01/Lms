@@ -183,9 +183,15 @@ function BlockFields({ block, onChange, uploadsEnabled }: { block: Block; onChan
       );
     case "embed":
       return (
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input value={block.url} onChange={(e) => onChange({ url: e.target.value })} placeholder="https://… (Google Slides, Desmos, PhET, Forms, etc.)" />
-          <input type="number" value={block.height} min={200} max={1200} onChange={(e) => onChange({ height: Number(e.target.value) })} className="sm:w-28" aria-label="Height" />
+        <div className="space-y-1">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input value={block.url} onChange={(e) => onChange({ url: e.target.value })} placeholder="https://… (Google Slides/Docs/Sheets/Forms, Drive, Canva, Desmos, PhET…)" />
+            <input type="number" value={block.height} min={200} max={1200} onChange={(e) => onChange({ height: Number(e.target.value) })} className="sm:w-28" aria-label="Height" />
+          </div>
+          <p className="muted text-xs">
+            Paste the normal share link — Google links are converted to embed links automatically. For Google files, set sharing to
+            &ldquo;Anyone with the link can view&rdquo; so students can see them.
+          </p>
         </div>
       );
     case "file":

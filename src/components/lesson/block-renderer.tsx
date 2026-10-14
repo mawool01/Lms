@@ -1,5 +1,5 @@
 import type { Block } from "@/lib/blocks";
-import { isSafeUrl, videoEmbedUrl } from "@/lib/blocks";
+import { embedUrl, isSafeUrl, videoEmbedUrl } from "@/lib/blocks";
 import { Markdown } from "@/components/markdown";
 import { ChartBlock } from "./chart-block";
 
@@ -53,7 +53,7 @@ export function BlockRenderer({ block }: { block: Block }) {
       if (!isSafeUrl(block.url)) return null;
       return (
         <div className="my-4 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
-          <iframe src={block.url} className="w-full" style={{ height: block.height }} allowFullScreen title="Embedded content" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation" />
+          <iframe src={embedUrl(block.url)} className="w-full" style={{ height: block.height }} allowFullScreen title="Embedded content" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation" />
         </div>
       );
     case "file":
