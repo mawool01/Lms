@@ -52,6 +52,8 @@ model User {
   participants     ConversationParticipant[]
   announcements    Announcement[]
   gradedSubmissions Submission[]      @relation("GradedBy")
+  scormUploads     ScormPackage[]
+  scormAttempts    ScormAttempt[]
 }
 
 // ─── Courses & content ───────────────────────────────────────────────────────
@@ -76,6 +78,7 @@ model Course {
   assignments   Assignment[]
   forumThreads  ForumThread[]
   announcements Announcement[]
+  scormPackages ScormPackage[]
 }
 
 model Enrollment {
@@ -96,6 +99,7 @@ model Module {
   position Int      @default(0)
   course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons  Lesson[]
+  scormPackages ScormPackage[]
 
   @@index([courseId])
 }
@@ -328,4 +332,76 @@ model UserBadge {
   badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, badgeId])
+}
+
+// ─── SCORM ───────────────────────────────────────────────────────────────────
+
+enum ScormVersion {
+  SCORM_12
+  SCORM_2004
+}
+
+enum ScormGradeMethod {
+  SCORE // use the score reported by the package (falls back to completion)
+  COMPLETION // full credit for completing the package
+}
+
+/// An uploaded SCORM package. Files are stored in Vercel Blob (or on local disk
+/// in development) and served from this app's origin so the content can reach
+/// the SCORM API on the player page.
+model ScormPackage {
+  id           String           @id @default(cuid())
+  courseId     String
+  moduleId     String?
+  title        String
+  description  String           @default("")
+  version      ScormVersion
+  launchPath   String
+  launchParams String           @default("")
+  masteryScore Float? // SCORM 1.2 adlcp:masteryscore (0–100)
+  storage      String // "blob" | "local"
+  storageBase  String // public base URL (blob) or directory (local)
+  fileCount    Int
+  sizeBytes    Int
+  gradeMethod  ScormGradeMethod @default(SCORE)
+  weight       Int              @default(20)
+  points       Int              @default(50)
+  published    Boolean          @default(false)
+  position     Int              @default(0)
+  uploadedById String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  course       Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module       Module?          @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  uploadedBy   User             @relation(fields: [uploadedById], references: [id])
+  attempts     ScormAttempt[]
+
+  @@index([courseId])
+}
+
+/// One learner's tracking data for a package (the SCORM "cmi" data model).
+model ScormAttempt {
+  id               String       @id @default(cuid())
+  packageId        String
+  userId           String
+  cmi              Json         @default("{}")
+  completionStatus String       @default("not attempted") // not attempted | incomplete | completed | browsed | unknown
+  successStatus    String       @default("unknown") // passed | failed | unknown
+  scoreRaw         Float?
+  scoreMin         Float?
+  scoreMax         Float?
+  scoreScaled      Float?
+  percent          Float? // score derived from the package, 0–100
+  overridePercent  Float? // teacher-assigned grade, 0–100
+  feedback         String?
+  gradedById       String?
+  totalSeconds     Int          @default(0)
+  sessions         Int          @default(0)
+  startedAt        DateTime     @default(now())
+  completedAt      DateTime?
+  updatedAt        DateTime     @updatedAt
+  package          ScormPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, userId])
 }

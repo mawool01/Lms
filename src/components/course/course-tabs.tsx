@@ -23,6 +23,6 @@ export function CourseTabs({ courseId, canManage }: { courseId: string; canManag
       : [{ key: "people", label: "People", href: `${base}/people` }]),
   ];
   const segment = pathname.slice(base.length).split("/")[1] ?? "";
-  const active = segment === "" || segment === "lessons" ? "overview" : segment;
+  const active = segment === "" || segment === "lessons" || segment === "scorm" ? "overview" : segment;
   return <Tabs items={items} active={active} />;
 }

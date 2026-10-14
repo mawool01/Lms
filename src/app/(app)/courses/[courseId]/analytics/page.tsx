@@ -34,15 +34,15 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ cour
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Quiz performance" action={<span className="muted text-xs">Average best score · red = below pass mark</span>}>
-          {a.quizPerformance.length ? <PercentBarChart data={a.quizPerformance} passMarkKey /> : <EmptyState icon="📝" title="No published quizzes" />}
+        <Card title="Assessment performance" action={<span className="muted text-xs">Quizzes & SCORM · average grade · red = below pass mark</span>}>
+          {a.quizPerformance.length ? <PercentBarChart data={a.quizPerformance} passMarkKey /> : <EmptyState icon="📝" title="No published quizzes or SCORM packages" />}
         </Card>
         <Card title="Grade distribution">
           <DistributionChart data={a.distribution} />
         </Card>
       </div>
 
-      <Card title="Lesson completion" action={<span className="muted text-xs">% of class that completed each lesson</span>}>
+      <Card title="Content completion" action={<span className="muted text-xs">% of class that completed each lesson / SCORM package</span>}>
         {a.lessonCompletion.length ? <PercentBarChart data={a.lessonCompletion} /> : <EmptyState icon="📘" title="No lessons yet" />}
       </Card>
 

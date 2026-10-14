@@ -7,6 +7,9 @@ import { letterGrade } from "@/lib/utils";
 import { LocalTime } from "@/components/forms";
 import { Avatar, Card, EmptyState, Pill, ProgressBar, Stat } from "@/components/ui";
 
+const ITEM_PATHS = { quiz: "quizzes", assignment: "assignments", scorm: "scorm" } as const;
+const ITEM_ICONS = { quiz: "📝", assignment: "📄", scorm: "📦" } as const;
+
 function gradeTone(p: number | null) {
   if (p === null) return "gray" as const;
   if (p >= 80) return "green" as const;
@@ -26,7 +29,7 @@ export default async function GradesPage({ params }: { params: Promise<{ courseI
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Current grade" value={r.grade !== null ? `${r.grade}%` : "—"} icon="🎯" />
           <Stat label="Letter" value={letterGrade(r.grade)} icon="🅰️" />
-          <Stat label="Lessons" value={`${r.lessonsDone}/${r.lessonsTotal}`} icon="📘" />
+          <Stat label="Content done" value={`${r.lessonsDone}/${r.lessonsTotal}`} icon="📘" />
           <Stat label="Progress" value={`${r.progress}%`} icon="📈" />
         </div>
         <Card title="Grade breakdown" action={<span className="muted text-xs">Weighted by item; only graded work counts</span>}>
@@ -39,11 +42,11 @@ export default async function GradesPage({ params }: { params: Promise<{ courseI
                 <tbody>
                   {r.items.map((i) => (
                     <tr key={i.id}>
-                      <td><Link className="hover:underline" href={`/courses/${courseId}/${i.kind === "quiz" ? "quizzes" : "assignments"}/${i.id}`}>{i.title}</Link></td>
-                      <td className="muted capitalize">{i.kind}</td>
+                      <td><Link className="hover:underline" href={`/courses/${courseId}/${ITEM_PATHS[i.kind]}/${i.id}`}>{i.title}</Link></td>
+                      <td className="muted capitalize">{i.kind === "scorm" ? "SCORM" : i.kind}</td>
                       <td className="muted">{i.dueAt ? <LocalTime date={i.dueAt} mode="date" /> : "—"}</td>
                       <td className="muted">{i.weight}</td>
-                      <td>{i.status === "submitted" ? <Pill tone="brand">Awaiting grade</Pill> : <Pill tone={gradeTone(i.percent)}>{i.percent !== null ? `${i.percent}%` : "Not started"}</Pill>}</td>
+                      <td>{i.status === "in-progress" ? <Pill tone="brand">In progress</Pill> : i.status === "submitted" ? <Pill tone="brand">Awaiting grade</Pill> : <Pill tone={gradeTone(i.percent)}>{i.percent !== null ? `${i.percent}%` : "Not started"}</Pill>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -70,7 +73,7 @@ export default async function GradesPage({ params }: { params: Promise<{ courseI
               <tr>
                 <th className="sticky left-0 bg-white dark:bg-slate-900">Student</th>
                 <th>Progress</th>
-                {columns.map((c) => <th key={c.id} title={c.title} className="max-w-[120px] truncate">{c.kind === "quiz" ? "📝" : "📄"} {c.title}</th>)}
+                {columns.map((c) => <th key={c.id} title={c.title} className="max-w-[120px] truncate">{ITEM_ICONS[c.kind]} {c.title}</th>)}
                 <th>Grade</th>
               </tr>
             </thead>
@@ -84,7 +87,7 @@ export default async function GradesPage({ params }: { params: Promise<{ courseI
                     </td>
                     <td className="w-32"><div className="flex items-center gap-2"><ProgressBar value={r.progress} /><span className="text-xs">{r.progress}%</span></div></td>
                     {r.items.map((i) => (
-                      <td key={i.id}>{i.status === "submitted" ? <Pill tone="brand">To grade</Pill> : i.percent !== null ? <Pill tone={gradeTone(i.percent)}>{i.percent}%</Pill> : <span className="muted">—</span>}</td>
+                      <td key={i.id}>{i.status === "in-progress" ? <Pill>In progress</Pill> : i.status === "submitted" ? <Pill tone="brand">To grade</Pill> : i.percent !== null ? <Pill tone={gradeTone(i.percent)}>{i.percent}%</Pill> : <span className="muted">—</span>}</td>
                     ))}
                     <td className="font-bold">{r.grade !== null ? `${r.grade}% (${letterGrade(r.grade)})` : "—"}</td>
                   </tr>

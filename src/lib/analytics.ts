@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import { courseReports } from "./grades";
+import { isComplete, scormGrade } from "./scorm/status";
 
 const DAY = 24 * 3600 * 1000;
 
@@ -47,7 +48,7 @@ export type StudentInsight = {
 };
 
 export async function courseAnalytics(courseId: string) {
-  const [enrollments, lessons, quizzes] = await Promise.all([
+  const [enrollments, lessons, quizzes, packages] = await Promise.all([
     db.enrollment.findMany({ where: { courseId }, include: { user: { select: { id: true, name: true, avatarUrl: true } } } }),
     db.lesson.findMany({
       where: { module: { courseId } },
@@ -55,6 +56,7 @@ export async function courseAnalytics(courseId: string) {
       select: { id: true, title: true, _count: { select: { completions: true } } },
     }),
     db.quiz.findMany({ where: { courseId, published: true }, orderBy: { createdAt: "asc" }, include: { attempts: { select: { userId: true, percent: true } } } }),
+    db.scormPackage.findMany({ where: { courseId, published: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }], include: { attempts: true } }),
   ]);
   const userIds = enrollments.map((e) => e.userId);
   const reports = await courseReports(courseId, userIds);
@@ -96,7 +98,13 @@ export async function courseAnalytics(courseId: string) {
   ];
 
   const enrolledSet = new Set(userIds);
-  const lessonCompletion = lessons.map((l) => ({ name: l.title, value: n ? Math.round((Math.min(l._count.completions, n) / n) * 100) : 0 }));
+  const lessonCompletion = [
+    ...lessons.map((l) => ({ name: l.title, value: n ? Math.round((Math.min(l._count.completions, n) / n) * 100) : 0 })),
+    ...packages.map((p) => {
+      const doneCount = p.attempts.filter((a) => enrolledSet.has(a.userId) && isComplete(a)).length;
+      return { name: `📦 ${p.title}`, value: n ? Math.round((doneCount / n) * 100) : 0 };
+    }),
+  ];
   const quizPerformance = quizzes.map((q) => {
     // Best attempt per enrolled student
     const best = new Map<string, number>();
@@ -104,6 +112,11 @@ export async function courseAnalytics(courseId: string) {
     const vals = [...best.values()];
     return { name: q.title, value: vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : 0, passMark: q.passingScore, attempted: vals.length };
   });
+
+  for (const p of packages) {
+    const vals = p.attempts.filter((a) => enrolledSet.has(a.userId)).map((a) => scormGrade(p, a)).filter((g): g is number => g !== null);
+    quizPerformance.push({ name: `📦 ${p.title}`, value: vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : 0, passMark: p.masteryScore ?? 0, attempted: vals.length });
+  }
 
   return {
     kpis: { students: n, avgProgress, avgGrade, activeWeek, atRisk: students.filter((s) => s.flags.length > 0).length },

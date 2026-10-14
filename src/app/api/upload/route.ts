@@ -17,7 +17,7 @@ export async function POST(req: Request) {
         if (!user || user.role === "STUDENT") throw new Error("Only teachers and admins can upload files");
         return {
           addRandomSuffix: true,
-          maximumSizeInBytes: 200 * 1024 * 1024,
+          maximumSizeInBytes: 500 * 1024 * 1024,
           allowedContentTypes: ["image/*", "video/*", "audio/*", "application/pdf", "application/*", "text/*"],
         };
       },

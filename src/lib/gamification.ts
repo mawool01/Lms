@@ -93,13 +93,27 @@ export async function onLessonCompleted(userId: string, lessonId: string) {
   if (completedCount >= 1) await awardBadge(userId, "first-steps");
   if (completedCount >= 25) await awardBadge(userId, "bookworm");
 
-  const [total, done] = await Promise.all([
+  await checkCourseCompletion(userId, courseId);
+}
+
+/** Awards the course-finisher badge once every lesson and published SCORM package is complete. */
+export async function checkCourseCompletion(userId: string, courseId: string) {
+  const [lessons, lessonsDone, packages, packagesDone] = await Promise.all([
     db.lesson.count({ where: { module: { courseId } } }),
     db.lessonCompletion.count({ where: { userId, lesson: { module: { courseId } } } }),
+    db.scormPackage.count({ where: { courseId, published: true } }),
+    db.scormAttempt.count({
+      where: {
+        userId,
+        package: { courseId, published: true },
+        OR: [{ completionStatus: "completed" }, { successStatus: { in: ["passed", "failed"] } }],
+      },
+    }),
   ]);
-  if (total > 0 && done >= total) {
+  const total = lessons + packages;
+  if (total > 0 && lessonsDone + packagesDone >= total) {
     await awardBadge(userId, "course-finisher");
-    await awardPoints(userId, POINTS.courseComplete, "Completed all lessons in a course", `course-complete:${courseId}`, courseId);
+    await awardPoints(userId, POINTS.courseComplete, "Completed all content in a course", `course-complete:${courseId}`, courseId);
   }
 }
 

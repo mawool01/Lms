@@ -8,6 +8,7 @@ A full-featured LMS for ICLCA built with **Next.js 15 (App Router)**, **PostgreS
 |---|---|
 | **User profiles & roles** | Admin / Teacher / Student roles; profile (name, photo, bio); preferences (light/dark/system theme, leaderboard visibility); password change; "your permissions" panel; public profile pages. Admins create users, bulk-import via CSV, assign roles, reset passwords and deactivate accounts. The first account to sign up becomes the admin. |
 | **Course management** | Courses → modules → lessons, reorderable. Lesson editor with content blocks: **Markdown text, images, video (YouTube/Vimeo/Loom/MP4), charts & graphs (bar/line/area/pie from CSV data), embeds (Slides, Desmos, PhET, Forms…), files/links, callouts** — with live preview. Optional direct uploads via Vercel Blob. Draft/publish, cover images, categories, enrollment management. |
+| **SCORM** | Upload SCORM 1.2 and SCORM 2004 packages (Articulate Storyline/Rise, Captivate, iSpring, Elucidat…) into any module. Built-in player with the full SCORM runtime API: tracks completion, pass/fail, score, time spent, interactions and suspend data (learners resume where they left off). Scores flow into the gradebook with a configurable weight ("grade by score" or "full credit on completion"); teachers can override grades with feedback, reset attempts, mark completion manually, and preview packages without being tracked. Sample packages are in `samples/`. |
 | **Assessments** | Quizzes (multiple choice, true/false, short answer) with auto-grading, pass marks, attempt limits, due dates and answer review. Assignments with text/link submissions, teacher grading and feedback. Weighted course grades with letter grades; student grade breakdowns; teacher gradebook with CSV export. |
 | **Analytics & reporting** | Live (auto-refreshing) course analytics: KPIs, 30-day activity, quiz performance vs. pass mark, grade distribution, lesson completion rates, per-question difficulty, and an "at-risk" student list (low grade, inactive, missing work, falling behind). Teacher and admin dashboards. |
 | **Communication** | Direct messaging (auto-updating) with one-click video calls; course forums with pinning and moderation; announcements; live classes via the course's Zoom/Meet/Teams link plus a free instant Jitsi video room per course; Learning Center course catalog. |
@@ -22,7 +23,7 @@ A full-featured LMS for ICLCA built with **Next.js 15 (App Router)**, **PostgreS
    - `DIRECT_URL` — direct (non-pooled) connection string, used for migrations (Neon on Vercel provides `DATABASE_URL_UNPOOLED`; copy its value here)
    - `AUTH_SECRET` — a long random string (`openssl rand -base64 32`)
    - `ALLOW_SIGNUP` — optional; set to `false` so only admins can create accounts
-   - `BLOB_READ_WRITE_TOKEN` — optional; added automatically when you create a *Vercel Blob* store. Enables the "Upload" button for images/videos/files in the lesson editor.
+   - `BLOB_READ_WRITE_TOKEN` — added automatically when you create a *Vercel Blob* store (Storage → Create → Blob). **Required for SCORM uploads in production**, and enables the "Upload" button for images/videos/files in the lesson editor. (Locally, without it, SCORM files are stored in `.data/scorm/`.)
 3. **Import the GitHub repo into Vercel.** The `vercel-build` script runs `prisma migrate deploy` automatically, so the database schema is created on each deploy.
 4. **Visit the site and sign up** — the first account becomes the administrator. Then add teachers and students from the **Admin** page.
 
@@ -56,4 +57,5 @@ src/components/            UI, lesson editor & renderer, charts, chat
 
 - Video calls link out to Zoom/Meet/Teams or open a free Jitsi room in a new tab (embedding Jitsi's public server is time-limited). A full Zoom API integration (auto-creating meetings) would need a Zoom app + credentials.
 - Messages and analytics update by polling (every few seconds / 30s), which works on Vercel without extra services.
+- SCORM: packages are served from the app's own domain (required so content can reach the SCORM API), so only upload packages from trusted authors — teachers and admins only can upload. Multi-SCO packages launch their first SCO; SCORM 2004 sequencing/navigation rules are not enforced. Packages up to 500 MB.
 - Email notifications are not yet implemented; they would need an email provider such as Resend.
