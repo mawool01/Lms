@@ -33,10 +33,11 @@ export default async function MyPortfolioPage() {
   const slug = await ensurePortfolioSlug(user);
   const org = (await getBranding()).shortName;
   const VERIFICATION_PILLS = verificationPills(org);
-  const [items, certCount, courses] = await Promise.all([
+  const [items, certCount, courses, badgeCount] = await Promise.all([
     db.portfolioItem.findMany({ where: { userId: user.id }, orderBy: [{ position: "asc" }, { startDate: "desc" }] }),
     db.certification.count({ where: { holderId: user.id, revokedAt: null } }),
     completedCourses(user.id),
+    db.userBadge.count({ where: { userId: user.id } }),
   ]);
   const blob = blobClientConfig();
   const toValues = (i: (typeof items)[number]) => ({ ...i, startDate: i.startDate?.toISOString() ?? null, endDate: i.endDate?.toISOString() ?? null });
@@ -140,7 +141,8 @@ export default async function MyPortfolioPage() {
                 <legend className="mb-1 text-sm font-medium">Include automatically</legend>
                 <label className="flex items-center gap-2 font-normal"><input type="checkbox" name="showCertifications" defaultChecked={user.portfolioShowCertifications} /> {org} certifications ({certCount})</label>
                 <label className="flex items-center gap-2 font-normal"><input type="checkbox" name="showCourses" defaultChecked={user.portfolioShowCourses} /> Completed courses ({courses.length})</label>
-                <label className="flex items-center gap-2 font-normal"><input type="checkbox" name="showBadges" defaultChecked={user.portfolioShowBadges} /> Badges &amp; points</label>
+                <label className="flex items-center gap-2 font-normal"><input type="checkbox" name="showBadges" defaultChecked={user.portfolioShowBadges} /> Badges ({badgeCount})</label>
+                <label className="flex items-center gap-2 font-normal"><input type="checkbox" name="showPoints" defaultChecked={user.portfolioShowPoints} /> Points &amp; level</label>
                 <p className="muted text-xs">These come from {org} records and are shown as verified. Course grades are never shown.</p>
               </fieldset>
               <SubmitButton>Save settings</SubmitButton>

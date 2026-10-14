@@ -71,7 +71,7 @@ export async function loadPortfolio(slug: string, viewer: { id: string; role: st
       id: true, name: true, avatarUrl: true, bio: true, institution: true, jobTitle: true, active: true,
       waMembershipLevel: true, waMembershipStatus: true, waIsMember: true,
       portfolioSlug: true, portfolioVisibility: true, portfolioHeadline: true, portfolioSummary: true,
-      portfolioShowCertifications: true, portfolioShowCourses: true, portfolioShowBadges: true,
+      portfolioShowCertifications: true, portfolioShowCourses: true, portfolioShowBadges: true, portfolioShowPoints: true,
     },
   });
   if (!user?.active) return null;
@@ -90,7 +90,7 @@ export async function loadPortfolio(slug: string, viewer: { id: string; role: st
       : Promise.resolve([]),
     user.portfolioShowCourses ? completedCourses(user.id) : Promise.resolve([]),
     user.portfolioShowBadges ? db.userBadge.findMany({ where: { userId: user.id }, include: { badge: true }, orderBy: { awardedAt: "asc" } }) : Promise.resolve([]),
-    user.portfolioShowBadges ? totalPoints(user.id) : Promise.resolve(0),
+    user.portfolioShowPoints ? totalPoints(user.id) : Promise.resolve(0),
   ]);
   const byType = Object.fromEntries(ITEM_TYPE_ORDER.map((t) => [t, items.filter((i) => i.type === t)])) as Record<(typeof ITEM_TYPE_ORDER)[number], typeof items>;
   return { user, isOwner, isAdmin, items, byType, certifications, courses, badges, points, level: levelFor(points) };

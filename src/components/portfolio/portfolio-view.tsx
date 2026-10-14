@@ -141,19 +141,23 @@ export function PortfolioView({ p, org }: { p: Portfolio; org: string }) {
         </Section>
       )}
 
-      {user.portfolioShowBadges && (p.badges.length > 0 || p.points > 0) && (
+      {((user.portfolioShowBadges && p.badges.length > 0) || (user.portfolioShowPoints && p.points > 0)) && (
         <Section title="Learning achievements" icon="🏆">
-          <p className="mb-3 text-sm">
-            <span className="font-semibold">{p.points.toLocaleString()} points</span> · Level {p.level.level} ({p.level.name})
-          </p>
-          <ul className="flex flex-wrap gap-2">
-            {p.badges.map((b) => (
-              <li key={b.id} title={b.badge.description} className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-sm dark:border-amber-800 dark:bg-amber-950/30">
-                <span>{b.badge.icon}</span>
-                {b.badge.name}
-              </li>
-            ))}
-          </ul>
+          {user.portfolioShowPoints && p.points > 0 && (
+            <p className="mb-3 text-sm">
+              <span className="font-semibold">{p.points.toLocaleString()} points</span> · Level {p.level.level} ({p.level.name})
+            </p>
+          )}
+          {user.portfolioShowBadges && p.badges.length > 0 && (
+            <ul className="flex flex-wrap gap-2">
+              {p.badges.map((b) => (
+                <li key={b.id} title={b.badge.description} className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-sm dark:border-amber-800 dark:bg-amber-950/30">
+                  <span>{b.badge.icon}</span>
+                  {b.badge.name}
+                </li>
+              ))}
+            </ul>
+          )}
         </Section>
       )}
     </article>

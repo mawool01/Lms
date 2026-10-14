@@ -37,6 +37,7 @@ export async function savePortfolioSettings(_prev: ActionResult, formData: FormD
         portfolioShowCertifications: formData.get("showCertifications") === "on",
         portfolioShowCourses: formData.get("showCourses") === "on",
         portfolioShowBadges: formData.get("showBadges") === "on",
+        portfolioShowPoints: formData.get("showPoints") === "on",
       },
     });
   } catch (e) {

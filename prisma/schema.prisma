@@ -54,6 +54,7 @@ model User {
   portfolioShowCertifications Boolean             @default(true)
   portfolioShowCourses        Boolean             @default(true)
   portfolioShowBadges         Boolean             @default(true)
+  portfolioShowPoints         Boolean             @default(false)
 
   // Certification profile
   certReviewer Boolean @default(false)

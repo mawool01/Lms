@@ -115,9 +115,15 @@ export async function renderTranscriptPdf(p: Portfolio, url: string) {
       text(tag(item.verification === "VERIFIED"), { indent: 10, size: 8, color: item.verification === "VERIFIED" ? GREEN : MUTED, gap: 8 });
     }
   }
-  if (p.user.portfolioShowBadges && (p.badges.length || p.points)) {
+  const showBadges = p.user.portfolioShowBadges && p.badges.length > 0;
+  const showPoints = p.user.portfolioShowPoints && p.points > 0;
+  if (showBadges || showPoints) {
     heading("Learning achievements");
-    text(`${p.points.toLocaleString()} points · Level ${p.level.level} (${p.level.name})${p.badges.length ? ` · Badges: ${p.badges.map((b) => b.badge.name).join(", ")}` : ""} ${tag(true)}`);
+    const parts = [
+      showPoints ? `${p.points.toLocaleString()} points · Level ${p.level.level} (${p.level.name})` : null,
+      showBadges ? `Badges: ${p.badges.map((b) => b.badge.name).join(", ")}` : null,
+    ].filter(Boolean);
+    text(`${parts.join(" · ")} ${tag(true)}`);
   }
 
   // Footer on every page
