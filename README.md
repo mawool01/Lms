@@ -6,6 +6,7 @@ A full-featured LMS for ICLCA built with **Next.js 15 (App Router)**, **PostgreS
 
 | Area | What's included |
 |---|---|
+| **Wild Apricot sign-on** | "Sign in with Wild Apricot" for ICLCA members and contacts (OAuth). New contacts get an account automatically; Wild Apricot account administrators become LMS admins; membership level and status sync at each sign-in and show on profiles and in Admin. Existing LMS accounts connect from Profile → "Connect Wild Apricot" (never taken over by email match). Email/password login remains as a fallback. |
 | **User profiles & roles** | Admin / Teacher / Student roles; profile (name, photo, bio); preferences (light/dark/system theme, leaderboard visibility); password change; "your permissions" panel; public profile pages. Admins create users, bulk-import via CSV, assign roles, reset passwords and deactivate accounts. The first account to sign up becomes the admin. |
 | **Course management** | Courses → modules → lessons, reorderable. Lesson editor with content blocks: **Markdown text, images, video (YouTube/Vimeo/Loom/MP4), charts & graphs (bar/line/area/pie from CSV data), embeds (Slides, Desmos, PhET, Forms…), files/links, callouts** — with live preview. Optional direct uploads via Vercel Blob. Draft/publish, cover images, categories, enrollment management. |
 | **SCORM** | Upload SCORM 1.2 and SCORM 2004 packages (Articulate Storyline/Rise, Captivate, iSpring, Elucidat…) into any module. Built-in player with the full SCORM runtime API: tracks completion, pass/fail, score, time spent, interactions and suspend data (learners resume where they left off). Scores flow into the gradebook with a configurable weight ("grade by score" or "full credit on completion"); teachers can override grades with feedback, reset attempts, mark completion manually, and preview packages without being tracked. Sample packages are in `samples/`. |
@@ -30,7 +31,10 @@ A full-featured LMS for ICLCA built with **Next.js 15 (App Router)**, **PostgreS
    - `CRON_SECRET` — any long random string; enables the daily certification-expiry job (`vercel.json` schedules it).
    - `RESEND_API_KEY` and `EMAIL_FROM` (e.g. `ICLCA <certifications@yourdomain.org>`) — send certification emails (submission receipts, review requests, decisions, expiry reminders) through [Resend](https://resend.com). Without them everything works, just without email.
    - `APP_URL` — your site's public address (e.g. `https://learn.iclca.org`) used in emails and on certificates; defaults to the Vercel production URL.
-5. **Visit the site and sign up** — the first account becomes the administrator. Then add teachers and students from the **Admin** page.
+5. **Wild Apricot sign-on** (optional): in Wild Apricot go to *Settings → Integration → Authorized applications → Authorize application → Server application*, give it a name, tick **Wild Apricot login**, and add your LMS domain (e.g. `learn.iclca.org` and/or `your-project.vercel.app`) under **Trusted redirect domains**. Then set in Vercel:
+   - `WILDAPRICOT_URL` — your Wild Apricot site address, e.g. `https://iclca.wildapricot.org` (or your custom domain)
+   - `WILDAPRICOT_CLIENT_ID` and `WILDAPRICOT_CLIENT_SECRET` — from the authorized application
+6. **Visit the site and sign up** — the first account becomes the administrator. Then add teachers and students from the **Admin** page.
 
 ## Local development
 

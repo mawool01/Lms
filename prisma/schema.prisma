@@ -26,7 +26,7 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   name         String
-  passwordHash String
+  passwordHash String? // null for people who only sign in with Wild Apricot
   role         Role     @default(STUDENT)
   bio          String?
   avatarUrl    String?
@@ -38,6 +38,13 @@ model User {
   theme              Theme   @default(SYSTEM)
   emailNotifications Boolean @default(true)
   showOnLeaderboard  Boolean @default(true)
+
+  // Wild Apricot single sign-on
+  waContactId        Int?      @unique
+  waMembershipLevel  String?
+  waMembershipStatus String?
+  waIsMember         Boolean   @default(false)
+  waSyncedAt         DateTime?
 
   // Certification profile
   certReviewer Boolean @default(false)

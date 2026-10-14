@@ -21,7 +21,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       where,
       orderBy: [{ role: "asc" }, { name: "asc" }],
       take: 200,
-      select: { id: true, name: true, email: true, role: true, active: true, avatarUrl: true, createdAt: true, _count: { select: { enrollments: true, coursesTaught: true } } },
+      select: { id: true, name: true, email: true, role: true, active: true, avatarUrl: true, createdAt: true, waContactId: true, waMembershipLevel: true, waMembershipStatus: true, _count: { select: { enrollments: true, coursesTaught: true } } },
     }),
     db.user.groupBy({ by: ["role"], _count: true }),
     db.course.count(),
@@ -63,6 +63,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   <div className="min-w-0 flex-1">
                     <Link href={`/users/${u.id}`} className="font-medium hover:underline">{u.name}</Link>
                     {!u.active && <span className="ml-2"><Pill tone="red">Deactivated</Pill></span>}
+                    {u.waContactId && (
+                      <span className="ml-2" title={u.waMembershipStatus ? `Wild Apricot status: ${u.waMembershipStatus}` : "Connected to Wild Apricot"}>
+                        <Pill tone={u.waMembershipStatus === "Active" ? "green" : "gray"}>🌿 {u.waMembershipLevel ?? "WA contact"}{u.waMembershipStatus && u.waMembershipStatus !== "Active" ? ` · ${u.waMembershipStatus}` : ""}</Pill>
+                      </span>
+                    )}
                     <p className="muted truncate text-xs">
                       {u.email} · joined {formatDate(u.createdAt)} · {u.role === "STUDENT" ? `${u._count.enrollments} courses` : `${u._count.coursesTaught} taught`}
                     </p>

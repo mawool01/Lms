@@ -10,7 +10,10 @@ export async function loginAction(_prev: ActionResult, formData: FormData): Prom
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const user = await db.user.findUnique({ where: { email } });
-  if (!user || !(await checkPassword(password, user.passwordHash))) return { error: "Invalid email or password." };
+  if (user && !user.passwordHash && user.waContactId) {
+    return { error: "This account signs in with Wild Apricot. Use the “Sign in with Wild Apricot” button." };
+  }
+  if (!user?.passwordHash || !(await checkPassword(password, user.passwordHash))) return { error: "Invalid email or password." };
   if (!user.active) return { error: "This account has been deactivated. Contact an administrator." };
   await startSession(user.id);
   const next = String(formData.get("next") ?? "");

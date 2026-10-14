@@ -45,10 +45,11 @@ export async function changePassword(_prev: ActionResult, formData: FormData): P
   const user = await db.user.findUniqueOrThrow({ where: { id: sessionUser.id } });
   const current = String(formData.get("current") ?? "");
   const next = String(formData.get("next") ?? "");
-  if (!(await checkPassword(current, user.passwordHash))) return { error: "Current password is incorrect." };
+  // People who joined through Wild Apricot have no password yet and can set one without the current-password check.
+  if (user.passwordHash && !(await checkPassword(current, user.passwordHash))) return { error: "Current password is incorrect." };
   if (next.length < 8) return { error: "New password must be at least 8 characters." };
   await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(next) } });
-  return { ok: "Password changed." };
+  return { ok: user.passwordHash ? "Password changed." : "Password set. You can now also sign in with your email." };
 }
 
 // ─── Admin ───────────────────────────────────────────────────────────────────
