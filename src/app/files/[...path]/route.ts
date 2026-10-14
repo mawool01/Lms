@@ -13,14 +13,15 @@ import { localUploadPath, localUploadsEnabled } from "@/lib/local-files";
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
-  if (!session) return new NextResponse("Unauthorized", { status: 401 });
   const { path } = await params;
   const pathname = path.map((p) => decodeURIComponent(p)).join("/");
-  if (pathname.split("/").includes("..") || !(await canReadUpload(session.userId, pathname))) return new NextResponse("Not found", { status: 404 });
+  // Only public portfolio attachments can be opened without signing in.
+  if (!session && !pathname.startsWith("portfolio/")) return new NextResponse("Unauthorized", { status: 401 });
+  if (pathname.split("/").includes("..") || !(await canReadUpload(session?.userId ?? null, pathname))) return new NextResponse("Not found", { status: 404 });
 
   const headers: Record<string, string> = {
     "Content-Type": mimeType(pathname),
-    "Cache-Control": "private, max-age=3600",
+    "Cache-Control": "private, max-age=300",
     "X-Content-Type-Options": "nosniff",
   };
   let body: BodyInit;

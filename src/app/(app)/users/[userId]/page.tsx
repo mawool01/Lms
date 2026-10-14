@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -13,7 +14,7 @@ export default async function UserPage({ params }: { params: Promise<{ userId: s
   const viewer = await requireUser();
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, role: true, bio: true, avatarUrl: true, createdAt: true, active: true, badges: { include: { badge: true } } },
+    select: { id: true, name: true, role: true, bio: true, avatarUrl: true, createdAt: true, active: true, portfolioSlug: true, portfolioVisibility: true, badges: { include: { badge: true } } },
   });
   if (!user || !user.active) notFound();
   const [points, taught, canMessage] = await Promise.all([
@@ -36,6 +37,9 @@ export default async function UserPage({ params }: { params: Promise<{ userId: s
             {user.bio && <p className="mt-2 max-w-xl whitespace-pre-wrap">{user.bio}</p>}
             <p className="muted mt-2 text-xs">Member since {user.createdAt.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
           </div>
+          {user.portfolioSlug && (user.portfolioVisibility !== "PRIVATE" || viewer.id === user.id || viewer.role === "ADMIN") && (
+            <Link href={`/p/${user.portfolioSlug}`} className="btn-secondary">🗂️ Portfolio</Link>
+          )}
           {canMessage && (
             <form action={startConversation.bind(null, user.id)}><button className="btn-primary">💬 Message</button></form>
           )}

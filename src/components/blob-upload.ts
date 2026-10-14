@@ -12,7 +12,7 @@ export type UploadedFile = { url: string; pathname: string; access: "public" | "
  */
 export async function uploadToBlob(
   file: File,
-  folder: "uploads" | "scorm-uploads" | "cert-evidence" | "submissions",
+  folder: "uploads" | "scorm-uploads" | "cert-evidence" | "submissions" | "portfolio",
   config: NonNullable<BlobClientConfig>,
   onProgress?: (percent: number) => void,
   /** Required for per-user folders (submissions, cert-evidence): the uploader's user id. */

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ROLE_LABELS, ROLE_PERMISSIONS } from "@/lib/permissions";
@@ -23,7 +24,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PageHeader title="Profile & settings" />
+      <PageHeader title="Profile & settings" actions={<Link href="/portfolio" className="btn-secondary">🗂️ My portfolio</Link>} />
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card title="Profile">

@@ -5,7 +5,7 @@ export default async function PublicLayout({ children }: { children: React.React
   const user = await getCurrentUser();
   return (
     <div className="min-h-dvh">
-      <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+      <header className="border-b border-slate-200 bg-white print:hidden dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <Link href={user ? "/dashboard" : "/login"} className="flex items-center gap-2 font-bold">
             {/* eslint-disable-next-line @next/next/no-img-element */}

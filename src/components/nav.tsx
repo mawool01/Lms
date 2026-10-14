@@ -25,6 +25,7 @@ export function AppNav({
     { href: "/messages", label: "Messages", icon: "💬", badge: unread, mobile: true },
     { href: "/leaderboard", label: "Leaderboard", icon: "🏆", mobile: true },
     { href: "/certifications", label: "Certifications", icon: "🎖️" },
+    { href: "/portfolio", label: "Portfolio", icon: "🗂️" },
     { href: "/profile", label: "Profile", icon: "👤" },
   ];
   if (user.role === "ADMIN") {

@@ -46,6 +46,15 @@ model User {
   waIsMember         Boolean   @default(false)
   waSyncedAt         DateTime?
 
+  // Portfolio
+  portfolioSlug               String?             @unique
+  portfolioVisibility         PortfolioVisibility @default(UNLISTED)
+  portfolioHeadline           String?
+  portfolioSummary            String?
+  portfolioShowCertifications Boolean             @default(true)
+  portfolioShowCourses        Boolean             @default(true)
+  portfolioShowBadges         Boolean             @default(true)
+
   // Certification profile
   certReviewer Boolean @default(false)
   institution  String?
@@ -71,6 +80,8 @@ model User {
   certReviews      CertReview[]
   certMessages     CertMessage[]
   certifications   Certification[]
+  portfolioItems   PortfolioItem[]     @relation("PortfolioOwner")
+  portfolioVerified PortfolioItem[]    @relation("PortfolioVerifier")
 }
 
 // ─── Courses & content ───────────────────────────────────────────────────────
@@ -623,4 +634,60 @@ model Certification {
 
   @@index([holderId])
   @@index([expiresAt])
+}
+
+// ─── Portfolio ───────────────────────────────────────────────────────────────
+
+enum PortfolioVisibility {
+  PUBLIC // anyone; search engines may index it
+  UNLISTED // anyone with the link
+  PRIVATE // only the owner and admins
+}
+
+enum PortfolioItemType {
+  POSITION
+  PRESENTATION
+  PUBLICATION
+  SERVICE
+  AWARD
+  PROFESSIONAL_DEVELOPMENT
+}
+
+enum PortfolioVerification {
+  NONE
+  REQUESTED
+  VERIFIED
+  DECLINED
+}
+
+/// Something a person adds to their portfolio themselves (self-reported unless ICLCA verifies it).
+model PortfolioItem {
+  id               String                @id @default(cuid())
+  userId           String
+  type             PortfolioItemType
+  title            String
+  organization     String? // employer, event, publisher…
+  role             String?
+  location         String?
+  startDate        DateTime?
+  endDate          DateTime?
+  current          Boolean               @default(false)
+  description      String                @default("")
+  url              String?
+  files            String[]              @default([])
+  hours            Float? // professional development hours
+  collaborators    String?
+  visible          Boolean               @default(true)
+  position         Int                   @default(0)
+  verification     PortfolioVerification @default(NONE)
+  verificationNote String?
+  verifiedById     String?
+  verifiedAt       DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  user             User                  @relation("PortfolioOwner", fields: [userId], references: [id], onDelete: Cascade)
+  verifiedBy       User?                 @relation("PortfolioVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([verification])
 }

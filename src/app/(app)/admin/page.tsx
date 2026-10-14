@@ -29,11 +29,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     db.enrollment.count(),
     db.quizAttempt.count(),
   ]);
+  const pendingVerifications = await db.portfolioItem.count({ where: { verification: "REQUESTED" } });
   const roleCount = (r: Role) => counts.find((c) => c.role === r)?._count ?? 0;
 
   return (
     <>
-      <PageHeader title="Administration" subtitle="Manage people, roles and the platform." actions={<><Link href="/admin/certifications" className="btn-primary">🎖️ Certifications</Link><Link href="/courses" className="btn-secondary">All courses</Link></>} />
+      <PageHeader title="Administration" subtitle="Manage people, roles and the platform." actions={<><Link href="/admin/certifications" className="btn-primary">🎖️ Certifications</Link><Link href="/admin/portfolio" className="btn-secondary">🗂️ Portfolio verification{pendingVerifications ? ` (${pendingVerifications})` : ""}</Link><Link href="/courses" className="btn-secondary">All courses</Link></>} />
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-6">
         <Stat label="Students" value={roleCount("STUDENT")} />
         <Stat label="Teachers" value={roleCount("TEACHER")} />

@@ -4,7 +4,7 @@ import { SESSION_COOKIE, verifySession } from "@/lib/session";
 /** Sign-in pages: signed-in users are sent to the dashboard. */
 const AUTH_PATHS = ["/login", "/signup"];
 /** Pages anyone can see, signed in or not. */
-const OPEN_PATHS = ["/directory", "/verify", "/api/cron", "/auth/wildapricot"];
+const OPEN_PATHS = ["/directory", "/verify", "/api/cron", "/auth/wildapricot", "/p", "/files/portfolio"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

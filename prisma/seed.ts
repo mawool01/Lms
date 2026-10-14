@@ -313,6 +313,30 @@ async function main() {
     ],
   });
 
+  // ─── Portfolio ───────────────────────────────────────────────────────────
+  await db.user.update({
+    where: { id: tRivera.id },
+    data: {
+      portfolioSlug: "maria-rivera",
+      portfolioVisibility: "PUBLIC",
+      portfolioHeadline: "Learning center director · tutor trainer · ICLCA presenter",
+      portfolioSummary: "I lead the Academic Success Center at ICLCA Demo College, where we serve 4,000 students a year through tutoring, SI and workshops.",
+      jobTitle: "Director, Academic Success Center",
+      institution: "ICLCA Demo College",
+    },
+  });
+  const ymd = (s: string) => new Date(`${s}-01T00:00:00Z`);
+  await db.portfolioItem.createMany({
+    data: [
+      { userId: tRivera.id, type: "POSITION", title: "Director, Academic Success Center", organization: "ICLCA Demo College", startDate: ymd("2019-08"), current: true, position: 0 },
+      { userId: tRivera.id, type: "POSITION", title: "Tutoring Coordinator", organization: "Riverside Community College", startDate: ymd("2014-01"), endDate: ymd("2019-07"), position: 1 },
+      { userId: tRivera.id, type: "PRESENTATION", title: "Scaling Peer Tutoring Without Losing Quality", organization: "ICLCA Annual Conference", location: "Chicago, IL", startDate: ymd("2025-10"), collaborators: "D. Chen", verification: "VERIFIED", verifiedById: admin.id, verifiedAt: daysAgo(30), position: 0 },
+      { userId: tRivera.id, type: "PUBLICATION", title: "What Students Say About Online Tutoring", organization: "Journal of College Reading and Learning", startDate: ymd("2024-03"), url: "https://example.org/article", position: 0 },
+      { userId: tRivera.id, type: "SERVICE", title: "Certification Review Committee", organization: "ICLCA", role: "Reviewer", startDate: ymd("2023-01"), current: true, position: 0 },
+      { userId: tRivera.id, type: "PROFESSIONAL_DEVELOPMENT", title: "CRLA Tutor Training Workshop", organization: "CRLA", startDate: ymd("2025-06"), hours: 12, position: 0 },
+    ],
+  });
+
   console.log("Seeded demo data. Sign in with e.g. admin@iclca.test / rivera@iclca.test / sam@iclca.test — password: password123");
 }
 
