@@ -5,7 +5,20 @@ import { cn } from "@/lib/utils";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-export function LeaderboardTable({ rows, currentUserId }: { rows: LeaderboardRow[]; currentUserId: string }) {
+/**
+ * Ranked list of learners. `showPoints` is off on course leaderboards, where a
+ * visible total would let classmates work out how someone scored on the
+ * course's quizzes and assignments; the standing alone is still shown.
+ */
+export function LeaderboardTable({
+  rows,
+  currentUserId,
+  showPoints = true,
+}: {
+  rows: LeaderboardRow[];
+  currentUserId: string;
+  showPoints?: boolean;
+}) {
   if (!rows.length) return <EmptyState icon="🏁" title="No points earned yet">Complete lessons and quizzes to get on the board.</EmptyState>;
   return (
     <ol className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -17,7 +30,7 @@ export function LeaderboardTable({ rows, currentUserId }: { rows: LeaderboardRow
             {r.name} {r.userId === currentUserId && <span className="muted text-xs">(you)</span>}
           </Link>
           <span className="muted hidden text-xs sm:inline">🏅 {r.badges}</span>
-          <span className="w-20 text-right font-bold">{r.points.toLocaleString()} <span className="muted text-xs font-normal">pts</span></span>
+          {showPoints && <span className="w-20 text-right font-bold">{r.points.toLocaleString()} <span className="muted text-xs font-normal">pts</span></span>}
         </li>
       ))}
     </ol>

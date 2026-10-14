@@ -10,8 +10,8 @@ export default async function CourseLeaderboardPage({ params }: { params: Promis
   await requireCourseMember(user, courseId);
   const rows = await leaderboard({ courseId });
   return (
-    <Card title="Course leaderboard" action={<span className="muted text-xs">Points earned in this course</span>}>
-      <LeaderboardTable rows={rows} currentUserId={user.id} />
+    <Card title="Course leaderboard" action={<span className="muted text-xs">Ranked by points earned in this course</span>}>
+      <LeaderboardTable rows={rows} currentUserId={user.id} showPoints={false} />
     </Card>
   );
 }
