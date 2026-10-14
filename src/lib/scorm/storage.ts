@@ -1,17 +1,20 @@
 import "server-only";
 import { mkdir, readFile, rm, writeFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { del, list, put } from "@vercel/blob";
+import { del, get, list } from "@vercel/blob";
+import { blobMode, putBlob, type BlobAccess } from "@/lib/blob";
 import { mimeType } from "./mime";
 
 /**
- * SCORM files live in Vercel Blob in production. Without a Blob token (local
+ * SCORM files live in Vercel Blob in production. Without Blob configured (local
  * development) they're written to ./.data/scorm on disk.
+ *
+ * Stored kinds: "blob" (public store), "blob-private" (private store), "local".
  */
 export type StorageKind = "blob" | "local";
 
 export function storageKind(): StorageKind | null {
-  if (process.env.BLOB_READ_WRITE_TOKEN) return "blob";
+  if (blobMode()) return "blob";
   if (process.env.VERCEL) return null; // Vercel's filesystem is read-only: Blob is required.
   return "local";
 }
@@ -20,10 +23,10 @@ const LOCAL_ROOT = path.join(process.cwd(), ".data", "scorm");
 
 export const localDir = (packageId: string) => path.join(LOCAL_ROOT, packageId);
 
-const encodePath = (p: string) => p.split("/").map(encodeURIComponent).join("/");
+const blobAccessOf = (storage: string): BlobAccess => (storage === "blob-private" ? "private" : "public");
 
-/** Uploads all files with limited concurrency. Returns the storage base for later reads. */
-export async function storeFiles(kind: StorageKind, packageId: string, files: [string, Uint8Array][]): Promise<string> {
+/** Uploads all files with limited concurrency. Returns the storage kind to record for later reads. */
+export async function storeFiles(kind: StorageKind, packageId: string, files: [string, Uint8Array][]): Promise<{ storage: string; storageBase: string }> {
   if (kind === "local") {
     const dir = localDir(packageId);
     for (const [name, data] of files) {
@@ -31,25 +34,21 @@ export async function storeFiles(kind: StorageKind, packageId: string, files: [s
       await mkdir(path.dirname(target), { recursive: true });
       await writeFile(target, data);
     }
-    return dir;
+    return { storage: "local", storageBase: dir };
   }
-  let base = "";
+
   const queue = [...files];
+  // Upload one file first so the store's access level (public/private) is known before fanning out.
+  const [firstName, firstData] = queue.shift()!;
+  const first = await putBlob(`scorm/${packageId}/${firstName}`, Buffer.from(firstData), { contentType: mimeType(firstName), allowOverwrite: true });
   const worker = async () => {
     for (let next = queue.shift(); next; next = queue.shift()) {
       const [name, data] = next;
-      const pathname = `scorm/${packageId}/${name}`;
-      const blob = await put(pathname, Buffer.from(data), {
-        access: "public",
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        contentType: mimeType(name),
-      });
-      if (!base) base = blob.url.slice(0, blob.url.indexOf("/scorm/"));
+      await putBlob(`scorm/${packageId}/${name}`, Buffer.from(data), { contentType: mimeType(name), allowOverwrite: true });
     }
   };
   await Promise.all(Array.from({ length: 8 }, worker));
-  return base;
+  return { storage: first.access === "private" ? "blob-private" : "blob", storageBase: first.url.slice(0, first.url.indexOf("/scorm/")) };
 }
 
 /** Fetches one file. Supports HTTP range requests for media on Blob storage. */
@@ -70,14 +69,18 @@ export async function readStoredFile(
       return null;
     }
   }
-  const res = await fetch(`${pkg.storageBase}/scorm/${pkg.id}/${encodePath(filePath)}`, { headers: range ? { Range: range } : {} });
-  if (!res.ok || !res.body) return null;
+  // The SDK authenticates (token or OIDC) and works for both public and private stores.
+  const result = await get(`scorm/${pkg.id}/${filePath}`, {
+    access: blobAccessOf(pkg.storage),
+    ...(range ? { headers: { Range: range } } : {}),
+  }).catch(() => null);
+  if (!result || result.statusCode !== 200) return null;
   const headers: Record<string, string> = {};
   for (const h of ["content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
-    const v = res.headers.get(h);
+    const v = result.headers.get(h);
     if (v) headers[h] = v;
   }
-  return { status: res.status, body: res.body, headers };
+  return { status: headers["content-range"] ? 206 : 200, body: result.stream, headers };
 }
 
 export async function deleteStoredFiles(pkg: { id: string; storage: string; storageBase: string }) {

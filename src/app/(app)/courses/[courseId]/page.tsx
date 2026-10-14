@@ -18,6 +18,7 @@ import { Markdown } from "@/components/markdown";
 import { Avatar, Card, EmptyState, Pill, ProgressBar } from "@/components/ui";
 import { timeAgo } from "@/lib/utils";
 import { isComplete, statusLabel } from "@/lib/scorm/status";
+import { blobClientConfig } from "@/lib/blob";
 import { ScormUpload } from "@/components/scorm/scorm-upload";
 
 export default async function CourseOverview({ params }: { params: Promise<{ courseId: string }> }) {
@@ -54,7 +55,7 @@ export default async function CourseOverview({ params }: { params: Promise<{ cou
   const totalItems = allLessons.length + publishedScorm.length;
   const doneItems = done.size + scormDone;
   const progress = totalItems ? Math.round((doneItems / totalItems) * 100) : 0;
-  const blobEnabled = !!process.env.BLOB_READ_WRITE_TOKEN;
+  const blobConfig = blobClientConfig();
   const scormRow = (p: (typeof looseScorm)[number]) => {
     const attempt = scormByPkg.get(p.id);
     const finished = attempt ? isComplete(attempt) : false;
@@ -151,7 +152,7 @@ export default async function CourseOverview({ params }: { params: Promise<{ cou
                       <input name="title" placeholder="New lesson title" aria-label="New lesson title" required />
                       <SubmitButton className="btn-secondary shrink-0">+ Lesson</SubmitButton>
                     </ActionForm>
-                    <ScormUpload courseId={courseId} moduleId={mod.id} blobEnabled={blobEnabled} compact />
+                    <ScormUpload courseId={courseId} moduleId={mod.id} blobConfig={blobConfig} compact />
                   </div>
                 )}
               </div>

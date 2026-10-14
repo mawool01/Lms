@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { upload as uploadToBlob } from "@vercel/blob/client";
+import { uploadToBlob } from "@/components/blob-upload";
+import type { BlobClientConfig } from "@/lib/blob-config";
 import { BLOCK_LABELS, type Block, type BlockType } from "@/lib/blocks";
 import { saveLesson } from "@/lib/actions/courses";
 import { BlockRenderer } from "./block-renderer";
@@ -31,7 +32,7 @@ export function LessonEditor({
   lessonId: string;
   courseId: string;
   initial: { title: string; points: number; blocks: Block[] };
-  uploadsEnabled: boolean;
+  uploadsEnabled: BlobClientConfig;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initial.title);
@@ -130,7 +131,7 @@ export function LessonEditor({
   );
 }
 
-function BlockFields({ block, onChange, uploadsEnabled }: { block: Block; onChange: (patch: Partial<Block>) => void; uploadsEnabled: boolean }) {
+function BlockFields({ block, onChange, uploadsEnabled }: { block: Block; onChange: (patch: Partial<Block>) => void; uploadsEnabled: BlobClientConfig }) {
   switch (block.type) {
     case "text":
       return (
@@ -197,15 +198,15 @@ function BlockFields({ block, onChange, uploadsEnabled }: { block: Block; onChan
   }
 }
 
-function UrlField({ value, onChange, placeholder, accept, uploadsEnabled }: { value: string; onChange: (v: string) => void; placeholder: string; accept?: string; uploadsEnabled: boolean }) {
+function UrlField({ value, onChange, placeholder, accept, uploadsEnabled }: { value: string; onChange: (v: string) => void; placeholder: string; accept?: string; uploadsEnabled: BlobClientConfig }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   async function upload(file: File) {
     setUploading(true);
     setError("");
     try {
-      const blob = await uploadToBlob(`lms/${file.name}`, file, { access: "public", handleUploadUrl: "/api/upload" });
-      onChange(blob.url);
+      const uploaded = await uploadToBlob(file, "uploads", uploadsEnabled!);
+      onChange(uploaded.url);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -216,7 +217,7 @@ function UrlField({ value, onChange, placeholder, accept, uploadsEnabled }: { va
     <div>
       <div className="flex gap-2">
         <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
-        {uploadsEnabled && (
+        {!!uploadsEnabled && (
           <label className="btn-secondary shrink-0 cursor-pointer">
             {uploading ? "Uploading…" : "Upload"}
             <input type="file" accept={accept} className="hidden" disabled={uploading} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />

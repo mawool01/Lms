@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireCourseManager } from "@/lib/permissions";
 import { parseBlocks } from "@/lib/blocks";
 import { deleteLesson } from "@/lib/actions/courses";
+import { blobClientConfig } from "@/lib/blob";
 import { LessonEditor } from "@/components/lesson/lesson-editor";
 
 export default async function EditLessonPage({ params }: { params: Promise<{ courseId: string; lessonId: string }> }) {
@@ -26,7 +27,7 @@ export default async function EditLessonPage({ params }: { params: Promise<{ cou
         lessonId={lessonId}
         courseId={courseId}
         initial={{ title: lesson.title, points: lesson.points, blocks: parseBlocks(lesson.blocks) }}
-        uploadsEnabled={!!process.env.BLOB_READ_WRITE_TOKEN}
+        uploadsEnabled={blobClientConfig()}
       />
     </div>
   );

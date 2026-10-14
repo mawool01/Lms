@@ -26,7 +26,7 @@ export async function importScormPackage(opts: {
   uploadedById: string;
 }) {
   const kind = storageKind();
-  if (!kind) throw new ScormImportError("SCORM uploads need file storage. Connect a Vercel Blob store to this project (it sets BLOB_READ_WRITE_TOKEN).");
+  if (!kind) throw new ScormImportError("SCORM uploads need file storage. Connect a Vercel Blob store to this project (it sets BLOB_STORE_ID or BLOB_READ_WRITE_TOKEN), then redeploy.");
   if (opts.zip.byteLength > MAX_PACKAGE_BYTES) throw new ScormImportError("Package is larger than 500 MB.");
 
   let entries: Record<string, Uint8Array>;
@@ -89,8 +89,8 @@ export async function importScormPackage(opts: {
     },
   });
   try {
-    const storageBase = await storeFiles(kind, pkg.id, rooted);
-    return { pkg: await db.scormPackage.update({ where: { id: pkg.id }, data: { storageBase } }), scoCount: manifest.scoCount };
+    const stored = await storeFiles(kind, pkg.id, rooted);
+    return { pkg: await db.scormPackage.update({ where: { id: pkg.id }, data: stored }), scoCount: manifest.scoCount };
   } catch (e) {
     await deleteStoredFiles({ id: pkg.id, storage: kind, storageBase: "" }).catch(() => {});
     await db.scormPackage.delete({ where: { id: pkg.id } });

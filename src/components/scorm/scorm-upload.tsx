@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { upload as uploadToBlob } from "@vercel/blob/client";
+import { uploadToBlob } from "@/components/blob-upload";
+import type { BlobClientConfig } from "@/lib/blob-config";
 
 /** Uploads a SCORM .zip (directly to Vercel Blob when available) and imports it. */
-export function ScormUpload({ courseId, moduleId, blobEnabled, compact = false }: { courseId: string; moduleId?: string; blobEnabled: boolean; compact?: boolean }) {
+export function ScormUpload({ courseId, moduleId, blobConfig, compact = false }: { courseId: string; moduleId?: string; blobConfig: BlobClientConfig; compact?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(!compact);
   const [file, setFile] = useState<File | null>(null);
@@ -32,16 +33,15 @@ export function ScormUpload({ courseId, moduleId, blobEnabled, compact = false }
     try {
       const options = { courseId, moduleId: moduleId ?? "", title, gradeMethod, weight: String(weight) };
       let res: Response;
-      if (blobEnabled) {
+      if (blobConfig) {
         setStatus("Uploading… 0%");
-        const blob = await uploadToBlob(`scorm-uploads/${file.name}`, file, {
-          access: "public",
-          handleUploadUrl: "/api/upload",
-          multipart: file.size > 50 * 1024 * 1024,
-          onUploadProgress: (p) => setStatus(`Uploading… ${Math.round(p.percentage)}%`),
-        });
+        const uploaded = await uploadToBlob(file, "scorm-uploads", blobConfig, (p) => setStatus(`Uploading… ${p}%`));
         setStatus("Unpacking and installing…");
-        res = await fetch("/api/scorm/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...options, blobUrl: blob.url }) });
+        res = await fetch("/api/scorm/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...options, blobPathname: uploaded.pathname, blobAccess: uploaded.access }),
+        });
       } else {
         setStatus("Uploading and installing…");
         res = await fetch(`/api/scorm/import?${new URLSearchParams(options)}`, { method: "POST", headers: { "Content-Type": "application/zip" }, body: file });
