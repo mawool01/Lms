@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getBranding } from "@/lib/branding";
 import { db } from "@/lib/db";
+import { HOLDER_PORTFOLIO_SELECT, HolderName } from "@/components/portfolio/holder-link";
 import { CERT_STATE_LABELS, certState, normalizeCode } from "@/lib/certifications/status";
 import { formatDate } from "@/lib/utils";
 import { Card } from "@/components/ui";
@@ -12,7 +13,7 @@ export default async function VerifyCodePage({ params }: { params: Promise<{ cod
   const org = (await getBranding()).shortName;
   const cert = await db.certification.findUnique({
     where: { code: normalizeCode(decodeURIComponent(code)) },
-    include: { program: { select: { name: true, kind: true } }, level: { select: { name: true } } },
+    include: { program: { select: { name: true, kind: true } }, level: { select: { name: true } }, holder: HOLDER_PORTFOLIO_SELECT },
   });
 
   if (!cert) {
@@ -40,11 +41,11 @@ export default async function VerifyCodePage({ params }: { params: Promise<{ cod
             <>
               <dt className="muted">Center</dt><dd className="font-semibold">{cert.centerName}</dd>
               <dt className="muted">Institution</dt><dd>{cert.institution ?? "—"}</dd>
-              <dt className="muted">Director</dt><dd>{cert.holderName}</dd>
+              <dt className="muted">Director</dt><dd><HolderName name={cert.holderName} holder={cert.holder} className="link" /></dd>
             </>
           ) : (
             <>
-              <dt className="muted">Name</dt><dd className="font-semibold">{cert.holderName}</dd>
+              <dt className="muted">Name</dt><dd className="font-semibold"><HolderName name={cert.holderName} holder={cert.holder} className="text-brand-700 dark:text-brand-300" /></dd>
               {cert.institution && (<><dt className="muted">Institution</dt><dd>{cert.institution}</dd></>)}
             </>
           )}

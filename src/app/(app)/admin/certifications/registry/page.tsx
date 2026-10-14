@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { HOLDER_PORTFOLIO_SELECT, HolderName } from "@/components/portfolio/holder-link";
 import { addCertificationManually, importCertifications, linkCertificationHolder, reinstateCertification, revokeCertification, setDirectoryVisibility } from "@/lib/actions/certifications";
 import { EXPIRING_SOON_DAYS } from "@/lib/certifications/status";
 import { registryWhere } from "@/lib/certifications/registry";
@@ -14,7 +15,7 @@ export default async function RegistryPage({ searchParams }: { searchParams: Pro
   const [certs, programs] = await Promise.all([
     db.certification.findMany({
       where: registryWhere({ q, program, state }),
-      include: { program: true, level: true },
+      include: { program: true, level: true, holder: HOLDER_PORTFOLIO_SELECT },
       orderBy: { issuedAt: "desc" },
       take: 500,
     }),
@@ -54,8 +55,8 @@ export default async function RegistryPage({ searchParams }: { searchParams: Pro
                 {certs.map((c) => (
                   <tr key={c.id}>
                     <td>
-                      <p className="font-medium">{c.centerName ?? c.holderName}</p>
-                      <p className="muted text-xs">{c.centerName ? `${c.holderName} · ` : ""}{c.institution}{!c.holderId && c.holderEmail && ` · ${c.holderEmail} (${accountEmails.has(c.holderEmail) ? "account exists — not linked" : "no account"})`}</p>
+                      <p className="font-medium">{c.centerName ?? <HolderName name={c.holderName} holder={c.holder} staff />}</p>
+                      <p className="muted text-xs">{c.centerName ? <><HolderName name={c.holderName} holder={c.holder} staff /> · </> : ""}{c.institution}{!c.holderId && c.holderEmail && ` · ${c.holderEmail} (${accountEmails.has(c.holderEmail) ? "account exists — not linked" : "no account"})`}</p>
                     </td>
                     <td className="text-sm">{c.program.name}<p className="muted text-xs">{c.level.name}{c.isRenewal && " · renewal"}</p></td>
                     <td className="muted text-xs whitespace-nowrap">{formatDate(c.issuedAt)}</td>

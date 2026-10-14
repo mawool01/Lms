@@ -105,6 +105,13 @@ export default async function MyPortfolioPage() {
           <Card title="Your link">
             <CopyLink url={portfolioUrl(slug)} />
             <p className="muted mt-2 text-xs">{VISIBILITY_LABELS[user.portfolioVisibility].label}: {VISIBILITY_LABELS[user.portfolioVisibility].description}</p>
+            {certCount > 0 && (
+              <p className="muted mt-2 text-xs">
+                {user.portfolioVisibility === "PRIVATE"
+                  ? `Your name in the ${org} certified directory and on certificate verification pages isn't linked while your portfolio is private.`
+                  : `Your name in the ${org} certified directory and on certificate verification pages links here.`}
+              </p>
+            )}
           </Card>
           <Card title="Settings">
             <ActionForm action={savePortfolioSettings} className="space-y-4">

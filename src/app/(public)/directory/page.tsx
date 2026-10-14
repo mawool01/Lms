@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getBranding } from "@/lib/branding";
 import { db } from "@/lib/db";
+import { HOLDER_PORTFOLIO_SELECT, HolderName } from "@/components/portfolio/holder-link";
 import { formatDate } from "@/lib/utils";
 import { Card, EmptyState, Pill } from "@/components/ui";
 
@@ -25,7 +26,7 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
           ? { AND: [{ OR: [{ holderName: { contains: q, mode: "insensitive" } }, { centerName: { contains: q, mode: "insensitive" } }, { institution: { contains: q, mode: "insensitive" } }] }] }
           : {}),
       },
-      include: { program: { select: { name: true, kind: true } }, level: { select: { name: true, position: true } } },
+      include: { program: { select: { name: true, kind: true } }, level: { select: { name: true, position: true } }, holder: HOLDER_PORTFOLIO_SELECT },
       orderBy: [{ level: { position: "desc" } }, { holderName: "asc" }],
       take: 1000,
     }),
@@ -36,8 +37,16 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
   const entry = (c: (typeof certs)[number]) => (
     <li key={c.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:gap-4">
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">{c.program.kind === "CENTER" ? c.centerName : c.holderName}</p>
-        <p className="muted text-sm">{c.program.kind === "CENTER" ? c.institution : c.institution ?? ""}</p>
+        <p className="font-semibold">{c.program.kind === "CENTER" ? c.centerName : <HolderName name={c.holderName} holder={c.holder} />}</p>
+        <p className="muted text-sm">
+          {c.program.kind === "CENTER" ? (
+            <>
+              {c.institution} · Director <HolderName name={c.holderName} holder={c.holder} />
+            </>
+          ) : (
+            c.institution ?? ""
+          )}
+        </p>
       </div>
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <Pill tone={c.program.kind === "CENTER" ? "purple" : "brand"}>{c.level.name}</Pill>
