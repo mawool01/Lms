@@ -114,7 +114,7 @@ async function StudentDashboard({ user }: { user: CurrentUser }) {
               <p className="muted text-sm">Complete your first lesson to earn a badge!</p>
             ) : (
               <div className="flex flex-wrap gap-2">
-                {badges.map((b) => <span key={b.id} title={`${b.badge.name}: ${b.badge.description}`} className="flex h-11 w-11 items-center justify-center rounded-full bg-amber-50 text-2xl ring-1 ring-amber-200 dark:bg-amber-950/40 dark:ring-amber-800">{b.badge.icon}</span>)}
+                {badges.map((b) => <span key={b.id} title={`${b.badge.name}: ${b.badge.description}`} className="flex h-11 w-11 items-center justify-center rounded-full bg-accent-50 text-2xl ring-1 ring-accent-200 dark:bg-accent-950/40 dark:ring-accent-800">{b.badge.icon}</span>)}
               </div>
             )}
           </Card>

@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth";
+import { getBranding } from "@/lib/branding";
 import { leaderboard, levelFor, POINTS, totalPoints } from "@/lib/gamification";
 import { LeaderboardTable } from "@/components/leaderboard-table";
 import { Card, PageHeader } from "@/components/ui";
@@ -15,7 +16,7 @@ export default async function LeaderboardPage() {
     <>
       <PageHeader title="Leaderboard" subtitle="Earn points by learning, participating and excelling." />
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2" title="ICLCA top learners">
+        <Card className="lg:col-span-2" title={`${(await getBranding()).shortName} top learners`}>
           <LeaderboardTable rows={rows} currentUserId={user.id} />
         </Card>
         <div className="space-y-6">

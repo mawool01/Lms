@@ -48,6 +48,7 @@ const PILL_TONES = {
   yellow: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
   red: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
   purple: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
+  accent: "bg-accent-100 text-accent-800 dark:bg-accent-900/40 dark:text-accent-200",
 };
 
 export function Pill({ children, tone = "gray" }: { children: ReactNode; tone?: keyof typeof PILL_TONES }) {

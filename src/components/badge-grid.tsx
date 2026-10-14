@@ -8,7 +8,7 @@ export function BadgeGrid({ earned }: { earned: { key: string; awardedAt: Date }
       {BADGES.map((b) => {
         const got = byKey.get(b.key);
         return (
-          <div key={b.key} className={cn("rounded-xl border p-3 text-center", got ? "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30" : "border-slate-200 opacity-50 grayscale dark:border-slate-800")}>
+          <div key={b.key} className={cn("rounded-xl border p-3 text-center", got ? "border-accent-200 bg-accent-50 dark:border-accent-800 dark:bg-accent-950/30" : "border-slate-200 opacity-50 grayscale dark:border-slate-800")}>
             <div className="text-3xl">{b.icon}</div>
             <p className="mt-1 text-sm font-semibold">{b.name}</p>
             <p className="muted text-xs">{b.description}</p>

@@ -1,11 +1,10 @@
 import "server-only";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { pdfBranding } from "@/lib/pdf-branding";
 import { formatDate } from "@/lib/utils";
 
-const BRAND = rgb(0.145, 0.278, 0.918);
 const DARK = rgb(0.06, 0.09, 0.16);
 const MUTED = rgb(0.39, 0.45, 0.55);
-const GOLD = rgb(0.78, 0.6, 0.18);
 
 /** Renders a landscape US-Letter certificate. */
 export async function renderCertificatePdf(cert: {
@@ -21,8 +20,9 @@ export async function renderCertificatePdf(cert: {
   verifyUrl: string;
 }) {
   const pdf = await PDFDocument.create();
+  const { branding, primary: BRAND, accent: GOLD, logo } = await pdfBranding(pdf);
   pdf.setTitle(`${cert.programName} — ${cert.isCenter ? cert.centerName : cert.holderName}`);
-  pdf.setAuthor("ICLCA");
+  pdf.setAuthor(branding.orgName);
   const page = pdf.addPage([792, 612]);
   const { width, height } = page.getSize();
   const serif = await pdf.embedFont(StandardFonts.TimesRoman);
@@ -45,7 +45,7 @@ export async function renderCertificatePdf(cert: {
     return t;
   };
 
-  centered("INTERNATIONAL COLLEGE LEARNING CENTER ASSOCIATION", height - 90, sansBold, 13, BRAND);
+  centered(branding.orgName.toUpperCase(), height - 90, sansBold, 13, BRAND);
   centered("Certificate of Certification", height - 145, serifBold, 38, DARK);
   centered("This certifies that", height - 195, serifItalic, 16, MUTED);
   if (cert.isCenter) {
@@ -73,10 +73,17 @@ export async function renderCertificatePdf(cert: {
   while (sans.widthOfTextAtSize(url, urlSize) > 210 && urlSize > 6) urlSize -= 0.5;
   page.drawText(url, { x: width - 300, y: footY - 10, size: urlSize, font: sans, color: BRAND });
 
-  // Seal
-  page.drawCircle({ x: width / 2, y: footY + 5, size: 34, borderColor: GOLD, borderWidth: 2, color: rgb(1, 0.97, 0.88) });
-  const seal = "ICLCA";
-  page.drawText(seal, { x: width / 2 - sansBold.widthOfTextAtSize(seal, 13) / 2, y: footY + 1, size: 13, font: sansBold, color: GOLD });
+  // Seal: the uploaded logo if it can be embedded, otherwise the short name in a ring.
+  if (logo) {
+    const dims = logo.scaleToFit(80, 60);
+    page.drawImage(logo, { x: width / 2 - dims.width / 2, y: footY + 5 - dims.height / 2, width: dims.width, height: dims.height });
+  } else {
+    page.drawCircle({ x: width / 2, y: footY + 5, size: 34, borderColor: GOLD, borderWidth: 2, color: rgb(1, 0.98, 0.92) });
+    const seal = clean(branding.shortName).slice(0, 10);
+    let sealSize = 13;
+    while (sansBold.widthOfTextAtSize(seal, sealSize) > 56 && sealSize > 6) sealSize -= 0.5;
+    page.drawText(seal, { x: width / 2 - sansBold.widthOfTextAtSize(seal, sealSize) / 2, y: footY + 1, size: sealSize, font: sansBold, color: GOLD });
+  }
 
   return pdf.save();
 }

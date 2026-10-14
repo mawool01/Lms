@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getBranding } from "@/lib/branding";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { blobClientConfig } from "@/lib/blob";
@@ -19,16 +20,19 @@ import { Card, PageHeader, Pill } from "@/components/ui";
 
 export const metadata = { title: "My portfolio" };
 
-const VERIFICATION_PILLS = {
-  NONE: null,
-  REQUESTED: <Pill tone="yellow">Verification requested</Pill>,
-  VERIFIED: <Pill tone="green">✓ Verified by ICLCA</Pill>,
-  DECLINED: <Pill tone="red">Not verified</Pill>,
-} as const;
+const verificationPills = (org: string) =>
+  ({
+    NONE: null,
+    REQUESTED: <Pill tone="yellow">Verification requested</Pill>,
+    VERIFIED: <Pill tone="green">✓ Verified by {org}</Pill>,
+    DECLINED: <Pill tone="red">Not verified</Pill>,
+  }) as const;
 
 export default async function MyPortfolioPage() {
   const user = await requireUser();
   const slug = await ensurePortfolioSlug(user);
+  const org = (await getBranding()).shortName;
+  const VERIFICATION_PILLS = verificationPills(org);
   const [items, certCount, courses] = await Promise.all([
     db.portfolioItem.findMany({ where: { userId: user.id }, orderBy: [{ position: "asc" }, { startDate: "desc" }] }),
     db.certification.count({ where: { holderId: user.id, revokedAt: null } }),
@@ -41,7 +45,7 @@ export default async function MyPortfolioPage() {
     <>
       <PageHeader
         title="My portfolio"
-        subtitle="Showcase your work and ICLCA achievements at your own link — a living transcript you can share with employers and colleagues."
+        subtitle={`Showcase your work and ${org} achievements at your own link — a living transcript you can share with employers and colleagues.`}
         actions={
           <>
             <Link href={`/p/${slug}`} className="btn-primary">👁 View portfolio</Link>
@@ -71,14 +75,14 @@ export default async function MyPortfolioPage() {
                             <span className="muted text-xs">Edit ▾</span>
                           </summary>
                           <div className="space-y-3 border-t border-slate-100 p-3 dark:border-slate-800">
-                            {item.verification === "DECLINED" && item.verificationNote && <p className="rounded-lg bg-red-50 p-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">ICLCA: {item.verificationNote}</p>}
+                            {item.verification === "DECLINED" && item.verificationNote && <p className="rounded-lg bg-red-50 p-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">{org}: {item.verificationNote}</p>}
                             <PortfolioItemForm type={type} action={savePortfolioItem.bind(null, item.id)} values={toValues(item)} blob={blob} userId={user.id} />
                             <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
                               <form action={movePortfolioItem.bind(null, item.id, -1)}><button className="btn-ghost btn-sm" disabled={idx === 0}>↑ Up</button></form>
                               <form action={movePortfolioItem.bind(null, item.id, 1)}><button className="btn-ghost btn-sm" disabled={idx === list.length - 1}>↓ Down</button></form>
                               <form action={togglePortfolioItem.bind(null, item.id)}><button className="btn-ghost btn-sm">{item.visible ? "Hide from portfolio" : "Show on portfolio"}</button></form>
                               {(item.verification === "NONE" || item.verification === "DECLINED") && (
-                                <form action={requestVerification.bind(null, item.id)}><button className="btn-ghost btn-sm">Request ICLCA verification</button></form>
+                                <form action={requestVerification.bind(null, item.id)}><button className="btn-ghost btn-sm">Request {org} verification</button></form>
                               )}
                               <form action={deletePortfolioItem.bind(null, item.id)}><button className="btn-ghost btn-sm text-red-600">Delete</button></form>
                             </div>
@@ -127,10 +131,10 @@ export default async function MyPortfolioPage() {
               </div>
               <fieldset className="space-y-1">
                 <legend className="mb-1 text-sm font-medium">Include automatically</legend>
-                <label className="flex items-center gap-2 font-normal"><input type="checkbox" name="showCertifications" defaultChecked={user.portfolioShowCertifications} /> ICLCA certifications ({certCount})</label>
+                <label className="flex items-center gap-2 font-normal"><input type="checkbox" name="showCertifications" defaultChecked={user.portfolioShowCertifications} /> {org} certifications ({certCount})</label>
                 <label className="flex items-center gap-2 font-normal"><input type="checkbox" name="showCourses" defaultChecked={user.portfolioShowCourses} /> Completed courses ({courses.length})</label>
                 <label className="flex items-center gap-2 font-normal"><input type="checkbox" name="showBadges" defaultChecked={user.portfolioShowBadges} /> Badges &amp; points</label>
-                <p className="muted text-xs">These come from ICLCA records and are shown as verified. Course grades are never shown.</p>
+                <p className="muted text-xs">These come from {org} records and are shown as verified. Course grades are never shown.</p>
               </fieldset>
               <SubmitButton>Save settings</SubmitButton>
             </ActionForm>

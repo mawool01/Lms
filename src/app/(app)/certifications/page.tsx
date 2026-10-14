@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getBranding } from "@/lib/branding";
 import { setDirectoryVisibility, startApplication } from "@/lib/actions/certifications";
 import { certState } from "@/lib/certifications/status";
 import { AppStatusPill, CertStatePill, VerifyLink, expiryText } from "@/components/cert/cert-ui";
@@ -12,6 +13,7 @@ export const metadata = { title: "Certifications" };
 
 export default async function CertificationsPage() {
   const user = await requireUser();
+  const branding = await getBranding();
   const [programs, applications, certifications, reviewCount] = await Promise.all([
     db.certProgram.findMany({ where: { active: true }, orderBy: { position: "asc" }, include: { levels: { where: { active: true }, orderBy: { position: "asc" } } } }),
     db.certApplication.findMany({ where: { applicantId: user.id }, include: { program: true, level: true }, orderBy: { updatedAt: "desc" } }),
@@ -22,7 +24,7 @@ export default async function CertificationsPage() {
   return (
     <>
       <PageHeader
-        title="ICLCA Certifications"
+        title={`${branding.shortName} Certifications`}
         subtitle="Apply for the Learning Center Leadership Certification and Learning Center of Excellence, track your applications and download your certificates."
         actions={
           <>

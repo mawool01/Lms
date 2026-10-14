@@ -27,6 +27,7 @@ export const UPLOAD_RULES: Record<string, Rule> = {
   "uploads/": { staffOnly: true, owned: false, maxBytes: 500 * MB, allowedContentTypes: ANY_TYPES }, // lesson media
   "scorm-uploads/": { staffOnly: true, owned: false, maxBytes: 500 * MB, allowedContentTypes: ANY_TYPES },
   "cert-evidence/": { staffOnly: false, owned: true, maxBytes: 100 * MB, allowedContentTypes: DOCUMENT_TYPES },
+  "branding/": { staffOnly: true, owned: false, maxBytes: 5 * MB, allowedContentTypes: ["image/png", "image/jpeg", "image/svg+xml", "image/webp", "image/x-icon", "image/vnd.microsoft.icon", "image/gif"] },
   "portfolio/": { staffOnly: false, owned: true, maxBytes: 100 * MB, allowedContentTypes: DOCUMENT_TYPES },
   "submissions/": { staffOnly: false, owned: true, maxBytes: 100 * MB, allowedContentTypes: DOCUMENT_TYPES },
 };

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getBranding } from "@/lib/branding";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { loginAction } from "@/lib/actions/auth";
 import { waEnabled } from "@/lib/wildapricot";
@@ -8,6 +9,7 @@ export const metadata = { title: "Sign in" };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
   const { next, error } = await searchParams;
+  const org = (await getBranding()).shortName;
   return (
     <>
       <h2 className="mb-6 text-xl font-semibold">Sign in</h2>
@@ -15,7 +17,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       {waEnabled() && (
         <>
           <WildApricotButton next={next} />
-          <p className="muted mt-2 text-center text-xs">ICLCA members and contacts: use your Wild Apricot login.</p>
+          <p className="muted mt-2 text-center text-xs">{org} members and contacts: use your Wild Apricot login.</p>
           <div className="my-6 flex items-center gap-3 text-xs text-slate-400">
             <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />or sign in with email<span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
           </div>

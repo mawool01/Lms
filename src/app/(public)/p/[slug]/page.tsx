@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getBranding } from "@/lib/branding";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
@@ -12,13 +13,14 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const p = await loadPortfolio(slug, await getCurrentUser());
   if (!p) return { title: "Portfolio not found", robots: { index: false } };
-  const description = p.user.portfolioHeadline ?? `ICLCA portfolio of ${p.user.name}`;
+  const org = (await getBranding()).shortName;
+  const description = p.user.portfolioHeadline ?? `${org} portfolio of ${p.user.name}`;
   return {
-    title: `${p.user.name} — ICLCA Portfolio`,
+    title: `${p.user.name} — ${org} Portfolio`,
     description,
     // Only public portfolios may be indexed by search engines.
     robots: p.user.portfolioVisibility === "PUBLIC" ? { index: true, follow: true } : { index: false, follow: false },
-    openGraph: { title: `${p.user.name} — ICLCA Portfolio`, description, type: "profile" },
+    openGraph: { title: `${p.user.name} — ${org} Portfolio`, description, type: "profile" },
   };
 }
 
@@ -27,6 +29,7 @@ export default async function PortfolioPage({ params }: Params) {
   const viewer = await getCurrentUser();
   const p = await loadPortfolio(slug, viewer);
   if (!p) notFound();
+  const org = (await getBranding()).shortName;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -41,10 +44,10 @@ export default async function PortfolioPage({ params }: Params) {
         </div>
       </div>
       <div className="card p-6 sm:p-10 print:border-0 print:p-0 print:shadow-none">
-        <PortfolioView p={p} />
+        <PortfolioView p={p} org={org} />
       </div>
       <p className="muted mt-6 text-center text-xs">
-        ICLCA portfolio · Items marked “Verified by ICLCA” are confirmed by ICLCA records; other items are self-reported.
+        {org} portfolio · Items marked “Verified by {org}” are confirmed by {org} records; other items are self-reported.
       </p>
     </div>
   );

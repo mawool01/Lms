@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getBranding } from "@/lib/branding";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -10,6 +11,7 @@ import { Card, PageHeader, Pill } from "@/components/ui";
 export default async function ApplyPage({ params }: { params: Promise<{ programKey: string }> }) {
   const { programKey } = await params;
   const user = await requireUser();
+  const org = (await getBranding()).shortName;
   const program = await db.certProgram.findUnique({
     where: { key: programKey },
     include: { levels: { where: { active: true }, orderBy: { position: "asc" } } },
@@ -52,7 +54,7 @@ export default async function ApplyPage({ params }: { params: Promise<{ programK
               <input id="institution" name="institution" defaultValue={user.institution ?? ""} />
             </div>
           )}
-          <p className="muted text-xs">Application fees are paid separately through ICLCA&apos;s online store. An administrator will confirm your payment.</p>
+          <p className="muted text-xs">Application fees are paid separately through {org}&apos;s online store. An administrator will confirm your payment.</p>
           <SubmitButton pendingText="Starting…">Start application</SubmitButton>
         </ActionForm>
       </Card>

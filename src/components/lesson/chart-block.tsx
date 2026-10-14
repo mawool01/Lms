@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -19,9 +20,21 @@ import {
 } from "recharts";
 import { parseChartData } from "@/lib/blocks";
 
-export const CHART_COLORS = ["#2547ea", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#0ea5e9", "#ec4899"];
+const OTHER_COLORS = ["#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#0ea5e9", "#ec4899"];
+export const CHART_COLORS = ["#2547ea", ...OTHER_COLORS];
+
+/** Chart palette whose first color is the admin-chosen brand color (read from the CSS variable at runtime). */
+export function useChartColors() {
+  const [colors, setColors] = useState(CHART_COLORS);
+  useEffect(() => {
+    const brand = getComputedStyle(document.documentElement).getPropertyValue("--color-brand-600").trim();
+    if (brand) setColors([brand, ...OTHER_COLORS]);
+  }, []);
+  return colors;
+}
 
 export function ChartBlock({ chartType, data, title }: { chartType: "bar" | "line" | "pie" | "area"; data: string; title?: string }) {
+  const CHART_COLORS = useChartColors();
   const { rows, series, labelKey } = parseChartData(data);
   if (!rows.length || !series.length) return <p className="muted text-sm italic">Chart has no data yet.</p>;
 

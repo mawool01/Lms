@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getBranding } from "@/lib/branding";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ROLE_LABELS, ROLE_PERMISSIONS } from "@/lib/permissions";
@@ -15,6 +16,7 @@ export const metadata = { title: "Profile & settings" };
 export default async function ProfilePage({ searchParams }: { searchParams: Promise<{ wa?: string; waerror?: string }> }) {
   const { wa, waerror } = await searchParams;
   const user = await requireUser();
+  const org = (await getBranding()).shortName;
   const hasPassword = !!(await db.user.findUnique({ where: { id: user.id }, select: { passwordHash: true } }))?.passwordHash;
   const [points, badges] = await Promise.all([
     totalPoints(user.id),
@@ -114,7 +116,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                 </dl>
               ) : (
                 <>
-                  <p className="muted mb-3 text-sm">Connect your ICLCA Wild Apricot login so you can sign in with it and keep your membership in sync.</p>
+                  <p className="muted mb-3 text-sm">Connect your {org} Wild Apricot login so you can sign in with it and keep your membership in sync.</p>
                   <a href="/auth/wildapricot/start?link=1" className="btn-secondary w-full">Connect Wild Apricot</a>
                 </>
               )}
@@ -128,7 +130,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
                 <li key={p} className="flex gap-2"><span className="text-emerald-500">✔</span>{p}</li>
               ))}
             </ul>
-            <p className="muted mt-4 text-xs">Roles are assigned by an ICLCA administrator.</p>
+            <p className="muted mt-4 text-xs">Roles are assigned by an {org} administrator.</p>
           </Card>
           {user.role === "STUDENT" && (
             <Card title="Level">

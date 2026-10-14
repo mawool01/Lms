@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
  */
 export async function canReadUpload(userId: string | null, pathname: string): Promise<boolean> {
   const [folder, owner] = pathname.split("/");
+  if (folder === "branding") return true; // logos and icons appear on public pages, including the sign-in page
   if (folder === "portfolio") {
     if (userId && owner === userId) return true;
     const suffix = `%/${pathname}`;

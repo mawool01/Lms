@@ -1,12 +1,17 @@
 import Link from "next/link";
+import { getBranding } from "@/lib/branding";
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 import { Card, EmptyState, Pill } from "@/components/ui";
 
-export const metadata = { title: "Certified Directory", description: "ICLCA certified learning center professionals and Learning Centers of Excellence." };
+export async function generateMetadata() {
+  const org = (await getBranding()).shortName;
+  return { title: "Certified Directory", description: `${org} certified learning center professionals and Learning Centers of Excellence.` };
+}
 
 export default async function DirectoryPage({ searchParams }: { searchParams: Promise<{ q?: string; program?: string }> }) {
   const { q = "", program = "" } = await searchParams;
+  const org = (await getBranding()).shortName;
   const now = new Date();
   const [programs, certs] = await Promise.all([
     db.certProgram.findMany({ orderBy: { position: "asc" }, select: { id: true, key: true, name: true, kind: true } }),
@@ -45,7 +50,7 @@ export default async function DirectoryPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <h1 className="text-3xl font-bold">Certified Directory</h1>
-      <p className="muted mt-1 mb-6">Learning center professionals and centers currently holding ICLCA certifications.</p>
+      <p className="muted mt-1 mb-6">Learning center professionals and centers currently holding {org} certifications.</p>
       <form className="mb-6 flex flex-col gap-2 sm:flex-row">
         <input name="q" defaultValue={q} placeholder="Search by name, center or institution" />
         <select name="program" defaultValue={program} className="sm:w-80">

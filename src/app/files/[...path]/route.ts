@@ -15,8 +15,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   const { path } = await params;
   const pathname = path.map((p) => decodeURIComponent(p)).join("/");
-  // Only public portfolio attachments can be opened without signing in.
-  if (!session && !pathname.startsWith("portfolio/")) return new NextResponse("Unauthorized", { status: 401 });
+  // Only branding images and public portfolio attachments can be opened without signing in.
+  if (!session && !pathname.startsWith("portfolio/") && !pathname.startsWith("branding/")) return new NextResponse("Unauthorized", { status: 401 });
   if (pathname.split("/").includes("..") || !(await canReadUpload(session?.userId ?? null, pathname))) return new NextResponse("Not found", { status: 404 });
 
   const headers: Record<string, string> = {

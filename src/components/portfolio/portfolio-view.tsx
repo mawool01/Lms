@@ -6,10 +6,10 @@ import { formatDate } from "@/lib/utils";
 import { Markdown } from "@/components/markdown";
 import { Avatar, Pill } from "@/components/ui";
 
-function VerifiedMark({ verified }: { verified: boolean }) {
+function VerifiedMark({ verified, org }: { verified: boolean; org: string }) {
   return verified ? (
-    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" title="Confirmed by ICLCA">
-      ✓ Verified by ICLCA
+    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" title={`Confirmed by ${org}`}>
+      ✓ Verified by {org}
     </span>
   ) : (
     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-400" title="Added by the portfolio owner">
@@ -31,7 +31,7 @@ function Section({ title, icon, children }: { title: string; icon: string; child
 }
 
 /** Full portfolio, as visitors see it. */
-export function PortfolioView({ p }: { p: Portfolio }) {
+export function PortfolioView({ p, org }: { p: Portfolio; org: string }) {
   const { user } = p;
   const pdHours = p.byType.PROFESSIONAL_DEVELOPMENT.reduce((s, i) => s + (i.hours ?? 0), 0);
 
@@ -45,7 +45,7 @@ export function PortfolioView({ p }: { p: Portfolio }) {
           <p className="muted mt-1">{[user.jobTitle, user.institution].filter(Boolean).join(" · ")}</p>
           <div className="mt-2 flex flex-wrap justify-center gap-2 sm:justify-start">
             {user.waIsMember && user.waMembershipLevel && (
-              <Pill tone={user.waMembershipStatus === "Active" ? "green" : "gray"}>ICLCA member · {user.waMembershipLevel}</Pill>
+              <Pill tone={user.waMembershipStatus === "Active" ? "green" : "gray"}>{org} member · {user.waMembershipLevel}</Pill>
             )}
             {p.certifications.filter((c) => ["active", "expiring"].includes(certState(c))).map((c) => (
               <Pill key={c.id} tone="brand">🎖️ {c.level.name}</Pill>
@@ -61,7 +61,7 @@ export function PortfolioView({ p }: { p: Portfolio }) {
       )}
 
       {p.certifications.length > 0 && (
-        <Section title="ICLCA certifications" icon="🎖️">
+        <Section title={`${org} certifications`} icon="🎖️">
           <ul className="space-y-3">
             {p.certifications.map((c) => {
               const state = certState(c);
@@ -77,7 +77,7 @@ export function PortfolioView({ p }: { p: Portfolio }) {
                   </div>
                   <span className="flex gap-1">
                     <Pill tone={CERT_STATE_LABELS[state].tone}>{CERT_STATE_LABELS[state].label}</Pill>
-                    <VerifiedMark verified />
+                    <VerifiedMark verified org={org} />
                   </span>
                 </li>
               );
@@ -107,7 +107,7 @@ export function PortfolioView({ p }: { p: Portfolio }) {
                         {[itemDates(item, meta.dates), item.hours ? `${item.hours} hours` : null, item.collaborators ? `with ${item.collaborators}` : null].filter(Boolean).join(" · ")}
                       </p>
                     </div>
-                    <VerifiedMark verified={item.verification === "VERIFIED"} />
+                    <VerifiedMark verified={item.verification === "VERIFIED"} org={org} />
                   </div>
                   {item.description && <div className="mt-1 text-sm"><Markdown>{item.description}</Markdown></div>}
                   {item.files.length > 0 && (
@@ -129,12 +129,12 @@ export function PortfolioView({ p }: { p: Portfolio }) {
       })}
 
       {p.courses.length > 0 && (
-        <Section title="ICLCA courses completed" icon="📘">
+        <Section title={`${org} courses completed`} icon="📘">
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {p.courses.map((c) => (
               <li key={c.id} className="flex flex-col gap-1 py-2 sm:flex-row sm:items-center sm:justify-between">
                 <span><span className="font-medium">{c.title}</span> <span className="muted text-xs">{c.code}</span></span>
-                <span className="flex items-center gap-2"><span className="muted text-xs">Completed {formatDate(c.completedAt)}</span><VerifiedMark verified /></span>
+                <span className="flex items-center gap-2"><span className="muted text-xs">Completed {formatDate(c.completedAt)}</span><VerifiedMark verified org={org} /></span>
               </li>
             ))}
           </ul>

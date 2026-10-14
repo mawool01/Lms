@@ -691,3 +691,21 @@ model PortfolioItem {
   @@index([userId])
   @@index([verification])
 }
+
+// ─── Site branding ───────────────────────────────────────────────────────────
+
+/// Single row (id "site") holding admin-editable branding.
+model SiteSettings {
+  id           String   @id @default("site")
+  siteName     String   @default("ICLCA Learning")
+  shortName    String   @default("ICLCA")
+  orgName      String   @default("International College Learning Center Association")
+  tagline      String   @default("Learn, teach and grow together")
+  loginMessage String   @default("")
+  primaryColor String   @default("#2547ea")
+  accentColor  String   @default("#c8992e")
+  logoUrl      String?
+  faviconUrl   String?
+  updatedAt    DateTime @updatedAt
+  updatedById  String?
+}

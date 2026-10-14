@@ -4,8 +4,8 @@ import type { Portfolio } from "./portfolio";
 import { ITEM_TYPES, ITEM_TYPE_ORDER, itemDates } from "./portfolio-meta";
 import { certState } from "./certifications/status";
 import { formatDate } from "./utils";
+import { pdfBranding } from "./pdf-branding";
 
-const BRAND = rgb(0.145, 0.278, 0.918);
 const DARK = rgb(0.06, 0.09, 0.16);
 const MUTED = rgb(0.39, 0.45, 0.55);
 const GREEN = rgb(0.02, 0.5, 0.33);
@@ -24,8 +24,9 @@ const clean = (s: string) => s.replace(/[“”]/g, '"').replace(/[‘’]/g, "'
 /** Renders an ICLCA transcript: verified records first, then self-reported items, paginated on US Letter. */
 export async function renderTranscriptPdf(p: Portfolio, url: string) {
   const pdf = await PDFDocument.create();
-  pdf.setTitle(`ICLCA Transcript — ${p.user.name}`);
-  pdf.setAuthor("ICLCA");
+  const { branding, primary: BRAND, logo } = await pdfBranding(pdf);
+  pdf.setTitle(`${branding.shortName} Transcript — ${p.user.name}`);
+  pdf.setAuthor(branding.orgName);
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const W = 612, H = 792, M = 54;
@@ -69,19 +70,23 @@ export async function renderTranscriptPdf(p: Portfolio, url: string) {
     page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 0.7, color: BRAND });
     y -= 8;
   };
-  const tag = (verified: boolean) => (verified ? "[Verified by ICLCA]" : "[Self-reported]");
+  const tag = (verified: boolean) => (verified ? `[Verified by ${clean(branding.shortName)}]` : "[Self-reported]");
 
   // Header
-  page.drawText("INTERNATIONAL COLLEGE LEARNING CENTER ASSOCIATION", { x: M, y: y - 10, size: 9, font: bold, color: BRAND });
+  if (logo) {
+    const dims = logo.scaleToFit(120, 36);
+    page.drawImage(logo, { x: W - M - dims.width, y: y - dims.height + 4, width: dims.width, height: dims.height });
+  }
+  page.drawText(clean(branding.orgName.toUpperCase()), { x: M, y: y - 10, size: 9, font: bold, color: BRAND });
   y -= 30;
   text(`Transcript of ${p.user.name}`, { font: bold, size: 20 });
   const sub = [p.user.portfolioHeadline, [p.user.jobTitle, p.user.institution].filter(Boolean).join(", ")].filter(Boolean).join(" - ");
   if (sub) text(sub, { size: 11, color: MUTED });
-  if (p.user.waIsMember && p.user.waMembershipLevel) text(`ICLCA member: ${p.user.waMembershipLevel}${p.user.waMembershipStatus ? ` (${p.user.waMembershipStatus})` : ""}`, { size: 10, color: MUTED });
+  if (p.user.waIsMember && p.user.waMembershipLevel) text(`${branding.shortName} member: ${p.user.waMembershipLevel}${p.user.waMembershipStatus ? ` (${p.user.waMembershipStatus})` : ""}`, { size: 10, color: MUTED });
   text(`Generated ${formatDate(new Date(), { dateStyle: "long" })} · ${url}`, { size: 8, color: MUTED });
 
   if (p.certifications.length) {
-    heading("ICLCA certifications");
+    heading(`${branding.shortName} certifications`);
     for (const c of p.certifications) {
       const state = certState(c);
       text(`${c.program.name} - ${c.level.name}`, { font: bold });
@@ -93,7 +98,7 @@ export async function renderTranscriptPdf(p: Portfolio, url: string) {
     }
   }
   if (p.courses.length) {
-    heading("ICLCA courses completed");
+    heading(`${branding.shortName} courses completed`);
     for (const c of p.courses) text(`${c.title} (${c.code}) - completed ${formatDate(c.completedAt)} ${tag(true)}`, { gap: 5 });
   }
   for (const type of ITEM_TYPE_ORDER) {
@@ -118,7 +123,7 @@ export async function renderTranscriptPdf(p: Portfolio, url: string) {
   // Footer on every page
   const pages = pdf.getPages();
   pages.forEach((pg, i) => {
-    const footer = clean(`Items marked "Verified by ICLCA" are confirmed by ICLCA records; others are self-reported.   Page ${i + 1} of ${pages.length}`);
+    const footer = clean(`Items marked "Verified by ${branding.shortName}" are confirmed by ${branding.shortName} records; others are self-reported.   Page ${i + 1} of ${pages.length}`);
     pg.drawText(footer, { x: M, y: M - 20, size: 7, font: regular, color: MUTED });
   });
   return pdf.save();

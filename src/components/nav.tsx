@@ -5,13 +5,16 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/lib/actions/auth";
+import { BrandLogo } from "@/components/brand";
 
 type NavItem = { href: string; label: string; icon: string; badge?: number; mobile?: boolean };
 
 export function AppNav({
   user,
   unread,
+  branding,
 }: {
+  branding: { siteName: string; shortName: string; logoUrl: string | null };
   user: { name: string; role: "ADMIN" | "TEACHER" | "STUDENT"; avatarUrl: string | null };
   unread: number;
 }) {
@@ -68,9 +71,8 @@ export function AppNav({
 
   const brand = (
     <Link href="/dashboard" className="flex items-center gap-2 font-bold">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/icon.svg" alt="" className="h-8 w-8" />
-      <span>ICLCA Learning</span>
+      <BrandLogo branding={branding} />
+      <span className="truncate">{branding.siteName}</span>
     </Link>
   );
 

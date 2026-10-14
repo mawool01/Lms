@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getBranding } from "@/lib/branding";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { signupAction } from "@/lib/actions/auth";
 import { waEnabled } from "@/lib/wildapricot";
@@ -6,13 +7,14 @@ import { WildApricotButton } from "@/components/wa-button";
 
 export const metadata = { title: "Create account" };
 
-export default function SignupPage() {
+export default async function SignupPage() {
+  const org = (await getBranding()).shortName;
   if (process.env.ALLOW_SIGNUP === "false") {
     return (
       <div className="space-y-4 text-center">
         {waEnabled() && <WildApricotButton label="Continue with Wild Apricot" />}
         <p>
-          {waEnabled() ? "Or ask" : "Self sign-up is disabled. Please ask"} an ICLCA administrator for an account. <Link href="/login" className="link">Sign in</Link>
+          {waEnabled() ? "Or ask" : "Self sign-up is disabled. Please ask"} an {org} administrator for an account. <Link href="/login" className="link">Sign in</Link>
         </p>
       </div>
     );
@@ -20,11 +22,11 @@ export default function SignupPage() {
   return (
     <>
       <h2 className="mb-2 text-xl font-semibold">Create your account</h2>
-      <p className="muted mb-6 text-sm">For ICLCA courses and for applying to ICLCA certifications (LCLC and Learning Centers of Excellence).</p>
+      <p className="muted mb-6 text-sm">For {org} courses and for applying to {org} certifications (LCLC and Learning Centers of Excellence).</p>
       {waEnabled() && (
         <div className="mb-6">
           <WildApricotButton label="Continue with Wild Apricot" />
-          <p className="muted mt-2 text-center text-xs">Have an ICLCA (Wild Apricot) login? Use it — no new password needed.</p>
+          <p className="muted mt-2 text-center text-xs">Have an {org} (Wild Apricot) login? Use it — no new password needed.</p>
         </div>
       )}
       <ActionForm action={signupAction} className="space-y-4">

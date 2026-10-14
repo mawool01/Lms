@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth";
+import { getBranding } from "@/lib/branding";
 import { db } from "@/lib/db";
 import { enroll } from "@/lib/actions/courses";
 import { CourseCard } from "@/components/course/course-card";
@@ -29,7 +30,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PageHeader title="Learning Center" subtitle="Discover courses offered at ICLCA and enroll in one click." />
+      <PageHeader title="Learning Center" subtitle={`Discover courses offered at ${(await getBranding()).shortName} and enroll in one click.`} />
       <form className="mb-6 flex flex-col gap-2 sm:flex-row">
         <input name="q" defaultValue={q} placeholder="Search courses…" className="sm:max-w-sm" />
         <select name="category" defaultValue={category} className="sm:max-w-[200px]">

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getBranding } from "@/lib/branding";
 import { blobClientConfig } from "@/lib/blob";
 import { criteriaFor, getApplicationAccess, isEditable } from "@/lib/certifications/access";
 import { withdrawApplication } from "@/lib/actions/certifications";
@@ -16,6 +17,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ ap
   const { applicationId } = await params;
   const user = await requireUser();
   const { app, isApplicant, isAdmin } = await getApplicationAccess(user, applicationId);
+  const org = (await getBranding()).shortName;
   // Staff use their own views.
   if (!isApplicant) redirect(isAdmin ? `/admin/certifications/applications/${applicationId}` : `/certifications/review/${applicationId}`);
 
@@ -40,14 +42,14 @@ export default async function ApplicationPage({ params }: { params: Promise<{ ap
         </div>
         <div className="mt-4 overflow-x-auto"><StatusTimeline status={app.status} /></div>
         <p className="muted mt-3 text-xs">
-          {app.submittedAt ? <>Submitted <LocalTime date={app.submittedAt} /></> : "Not submitted yet"} · Fee {app.feePaid ? "received ✓" : "not yet confirmed — pay through ICLCA's online store"}
+          {app.submittedAt ? <>Submitted <LocalTime date={app.submittedAt} /></> : "Not submitted yet"} · Fee {app.feePaid ? "received ✓" : `not yet confirmed — pay through ${org}'s online store`}
         </p>
       </Card>
 
       {(app.status === "SUBMITTED" || app.status === "UNDER_REVIEW") && (
         <Card title="✅ Application submitted" className="border-emerald-300 dark:border-emerald-800">
           <p className="text-sm">
-            Thank you! {app.status === "UNDER_REVIEW" ? "The review committee is evaluating your application." : "An ICLCA administrator will assign it to the review committee."} You&apos;ll be notified here{" "}
+            Thank you! {app.status === "UNDER_REVIEW" ? "The review committee is evaluating your application." : `An ${org} administrator will assign it to the review committee.`} You&apos;ll be notified here{" "}
             and by email if the committee needs anything else or when a decision is made.
           </p>
         </Card>

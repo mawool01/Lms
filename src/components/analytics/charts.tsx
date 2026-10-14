@@ -16,7 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CHART_COLORS } from "@/components/lesson/chart-block";
+import { useChartColors } from "@/components/lesson/chart-block";
 
 const tick = { fontSize: 11, fill: "currentColor" };
 const tooltipStyle = { borderRadius: 8, fontSize: 12, color: "#0f172a" };
@@ -34,6 +34,7 @@ export function AutoRefresh({ seconds = 30 }: { seconds?: number }) {
 }
 
 export function ActivityChart({ data }: { data: { day: string; Lessons: number; Quizzes: number; Assignments: number; Forum: number }[] }) {
+  const CHART_COLORS = useChartColors();
   return (
     <div className="h-64 text-slate-500">
       <ResponsiveContainer>
@@ -53,6 +54,7 @@ export function ActivityChart({ data }: { data: { day: string; Lessons: number; 
 }
 
 export function PercentBarChart({ data, passMarkKey }: { data: { name: string; value: number; passMark?: number }[]; passMarkKey?: boolean }) {
+  const CHART_COLORS = useChartColors();
   return (
     <div className="h-64 text-slate-500">
       <ResponsiveContainer>
