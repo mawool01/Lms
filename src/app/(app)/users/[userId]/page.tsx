@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { canSeePoints } from "@/lib/permissions";
 import { levelFor, totalPoints } from "@/lib/gamification";
 import { messageableUsers } from "@/lib/conversations";
 import { startConversation } from "@/lib/actions/community";
@@ -17,12 +18,16 @@ export default async function UserPage({ params }: { params: Promise<{ userId: s
     select: { id: true, name: true, role: true, bio: true, avatarUrl: true, createdAt: true, active: true, portfolioSlug: true, portfolioVisibility: true, badges: { include: { badge: true } } },
   });
   if (!user || !user.active) notFound();
+  const isSelf = viewer.id === user.id;
+  // Classmates mustn't see each other's points; teachers, admins and the learner
+  // do. Don't even load the total when it won't be shown.
+  const showPoints = canSeePoints(viewer, user.id);
   const [points, taught, canMessage] = await Promise.all([
-    totalPoints(user.id),
+    showPoints ? totalPoints(user.id) : Promise.resolve(0),
     user.role !== "STUDENT"
       ? db.course.findMany({ where: { teacherId: user.id, published: true }, include: { teacher: { select: { name: true } } } })
       : Promise.resolve([]),
-    viewer.id !== user.id && messageableUsers(viewer).then((list) => list.some((u) => u.id === user.id)),
+    !isSelf && messageableUsers(viewer).then((list) => list.some((u) => u.id === user.id)),
   ]);
   const level = levelFor(points);
 
@@ -47,12 +52,15 @@ export default async function UserPage({ params }: { params: Promise<{ userId: s
       </Card>
       {user.role === "STUDENT" && (
         <>
-          <div className="grid grid-cols-3 gap-3">
-            <Stat label="Points" value={points.toLocaleString()} icon="⭐" />
-            <Stat label="Level" value={level.level} hint={level.name} icon="🚀" />
-            <Stat label="Badges" value={user.badges.length} icon="🏅" />
-          </div>
-          <Card title="Badges">
+          {showPoints && (
+            <div className="grid grid-cols-3 gap-3">
+              <Stat label="Points" value={points.toLocaleString()} icon="⭐" />
+              <Stat label="Level" value={level.level} hint={level.name} icon="🚀" />
+              <Stat label="Badges" value={user.badges.length} icon="🏅" />
+              {!isSelf && <p className="muted col-span-3 text-xs">Points and level are visible to you as staff — students don&apos;t see each other&apos;s.</p>}
+            </div>
+          )}
+          <Card title="Badges" action={showPoints ? undefined : <span className="muted text-xs">🏅 {user.badges.length}</span>}>
             <BadgeGrid earned={user.badges.map((b) => ({ key: b.badge.key, awardedAt: b.awardedAt }))} />
           </Card>
         </>

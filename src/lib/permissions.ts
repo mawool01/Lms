@@ -28,6 +28,17 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
   ],
 };
 
+/**
+ * Points and the level derived from them track how a learner scored on quizzes
+ * and assignments, so classmates must not see each other's. Teachers and admins
+ * do, and a learner always sees their own. Pass `subjectId` when the points
+ * belong to one person; omit it for a list (a leaderboard), where only staff
+ * see figures and everyone else sees standings alone.
+ */
+export function canSeePoints(viewer: CurrentUser, subjectId?: string) {
+  return viewer.role !== "STUDENT" || viewer.id === subjectId;
+}
+
 export type CourseAccess = {
   course: NonNullable<Awaited<ReturnType<typeof loadCourse>>>;
   canManage: boolean;
