@@ -1,12 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
-const PUBLIC_PATHS = ["/login", "/signup"];
+/** Sign-in pages: signed-in users are sent to the dashboard. */
+const AUTH_PATHS = ["/login", "/signup"];
+/** Pages anyone can see, signed in or not. */
+const OPEN_PATHS = ["/directory", "/verify", "/api/cron"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
-  const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const matches = (paths: string[]) => paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (matches(OPEN_PATHS)) return NextResponse.next();
+  const isPublic = matches(AUTH_PATHS);
 
   if (!session && !isPublic) {
     if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

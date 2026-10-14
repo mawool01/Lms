@@ -16,9 +16,11 @@ export async function updateProfile(_prev: ActionResult, formData: FormData): Pr
   const name = String(formData.get("name") ?? "").trim();
   const bio = String(formData.get("bio") ?? "").trim().slice(0, 1000) || null;
   const avatarUrl = String(formData.get("avatarUrl") ?? "").trim() || null;
+  const institution = String(formData.get("institution") ?? "").trim().slice(0, 200) || null;
+  const jobTitle = String(formData.get("jobTitle") ?? "").trim().slice(0, 200) || null;
   if (name.length < 2) return { error: "Please enter your name." };
   if (avatarUrl && !isSafeUrl(avatarUrl)) return { error: "Avatar must be an http(s) image URL." };
-  await db.user.update({ where: { id: user.id }, data: { name, bio, avatarUrl } });
+  await db.user.update({ where: { id: user.id }, data: { name, bio, avatarUrl, institution, jobTitle } });
   revalidatePath("/", "layout");
   return { ok: "Profile updated." };
 }
@@ -64,7 +66,8 @@ export async function adminCreateUser(_prev: ActionResult, formData: FormData): 
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const { name, email, password, role } = parsed.data;
   if (await db.user.findUnique({ where: { email } })) return { error: "A user with that email already exists." };
-  await db.user.create({ data: { name, email, role, passwordHash: await hashPassword(password) } });
+  const user = await db.user.create({ data: { name, email, role, passwordHash: await hashPassword(password) } });
+  await db.certification.updateMany({ where: { holderEmail: email, holderId: null }, data: { holderId: user.id } });
   revalidatePath("/admin");
   return { ok: `Created ${name} (${role.toLowerCase()}).` };
 }

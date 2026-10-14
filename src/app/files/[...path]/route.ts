@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
   if (!session) return new NextResponse("Unauthorized", { status: 401 });
   const { path } = await params;
   const pathname = path.map((p) => decodeURIComponent(p)).join("/");
-  if (!pathname.startsWith("uploads/") || pathname.split("/").includes("..")) return new NextResponse("Not found", { status: 404 });
+  if (!(pathname.startsWith("uploads/") || pathname.startsWith("cert-evidence/")) || pathname.split("/").includes("..")) return new NextResponse("Not found", { status: 404 });
 
   const range = req.headers.get("range");
   const file = await get(pathname, { access: "private", ...(range ? { headers: { Range: range } } : {}) }).catch(() => null);

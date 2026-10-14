@@ -14,7 +14,8 @@ export default function SignupPage() {
   }
   return (
     <>
-      <h2 className="mb-6 text-xl font-semibold">Create your account</h2>
+      <h2 className="mb-2 text-xl font-semibold">Create your account</h2>
+      <p className="muted mb-6 text-sm">For ICLCA courses and for applying to ICLCA certifications (LCLC and Learning Centers of Excellence).</p>
       <ActionForm action={signupAction} className="space-y-4">
         <div className="field">
           <label htmlFor="name">Full name</label>

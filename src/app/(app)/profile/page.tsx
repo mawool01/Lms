@@ -36,6 +36,16 @@ export default async function ProfilePage() {
                 <label htmlFor="name">Display name</label>
                 <input id="name" name="name" defaultValue={user.name} required />
               </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="field">
+                  <label htmlFor="jobTitle">Job title</label>
+                  <input id="jobTitle" name="jobTitle" defaultValue={user.jobTitle ?? ""} placeholder="e.g. Director of Tutoring" />
+                </div>
+                <div className="field">
+                  <label htmlFor="institution">Institution</label>
+                  <input id="institution" name="institution" defaultValue={user.institution ?? ""} />
+                </div>
+              </div>
               <div className="field">
                 <label htmlFor="avatarUrl">Photo URL</label>
                 <input id="avatarUrl" name="avatarUrl" type="url" defaultValue={user.avatarUrl ?? ""} placeholder="https://…" />

@@ -39,6 +39,11 @@ model User {
   emailNotifications Boolean @default(true)
   showOnLeaderboard  Boolean @default(true)
 
+  // Certification profile
+  certReviewer Boolean @default(false)
+  institution  String?
+  jobTitle     String?
+
   coursesTaught    Course[]           @relation("CourseTeacher")
   enrollments      Enrollment[]
   completions      LessonCompletion[]
@@ -54,6 +59,11 @@ model User {
   gradedSubmissions Submission[]      @relation("GradedBy")
   scormUploads     ScormPackage[]
   scormAttempts    ScormAttempt[]
+  certApplications CertApplication[]  @relation("CertApplicant")
+  certDecisions    CertApplication[]  @relation("CertDecider")
+  certReviews      CertReview[]
+  certMessages     CertMessage[]
+  certifications   Certification[]
 }
 
 // ─── Courses & content ───────────────────────────────────────────────────────
@@ -404,4 +414,205 @@ model ScormAttempt {
   user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([packageId, userId])
+}
+
+// ─── ICLCA certifications ────────────────────────────────────────────────────
+
+enum CertProgramKind {
+  INDIVIDUAL // e.g. Learning Center Leadership Certification (LCLC)
+  CENTER // e.g. Learning Center Certification / Learning Center of Excellence
+}
+
+enum CertApplicationType {
+  INITIAL
+  RENEWAL
+}
+
+enum CertApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  DENIED
+  WITHDRAWN
+}
+
+enum CertRecommendation {
+  APPROVE
+  REVISE
+  DENY
+}
+
+enum CertRating {
+  DOES_NOT_MEET
+  MEETS
+  EXCEEDS
+}
+
+model CertProgram {
+  id                    String            @id @default(cuid())
+  key                   String            @unique
+  name                  String
+  kind                  CertProgramKind
+  description           String            @default("")
+  initialValidityMonths Int               @default(24)
+  renewalValidityMonths Int               @default(60)
+  active                Boolean           @default(true)
+  position              Int               @default(0)
+  createdAt             DateTime          @default(now())
+  levels                CertLevel[]
+  criteria              CertCriterion[]
+  applications          CertApplication[]
+  certifications        Certification[]
+}
+
+model CertLevel {
+  id             String            @id @default(cuid())
+  programId      String
+  name           String
+  description    String            @default("") // requirements (markdown)
+  feeNote        String            @default("")
+  lifetime       Boolean           @default(false)
+  active         Boolean           @default(true)
+  position       Int               @default(0)
+  program        CertProgram       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  criteria       CertCriterion[]
+  applications   CertApplication[]
+  certifications Certification[]
+
+  @@index([programId])
+}
+
+model CertCriterion {
+  id               String            @id @default(cuid())
+  programId        String
+  levelId          String? // null = applies to every level
+  section          String            @default("")
+  title            String
+  guidance         String            @default("") // what evidence to provide (markdown)
+  evidenceRequired Boolean           @default(true)
+  active           Boolean           @default(true)
+  position         Int               @default(0)
+  program          CertProgram       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  level            CertLevel?        @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  responses        CertResponse[]
+  scores           CertReviewScore[]
+
+  @@index([programId])
+}
+
+model CertApplication {
+  id                    String                @id @default(cuid())
+  programId             String
+  levelId               String
+  applicantId           String
+  type                  CertApplicationType   @default(INITIAL)
+  renewsCertificationId String?
+  status                CertApplicationStatus @default(DRAFT)
+  centerName            String?
+  institution           String?
+  statement             String                @default("")
+  feePaid               Boolean               @default(false)
+  feeNote               String                @default("")
+  submittedAt           DateTime?
+  decidedAt             DateTime?
+  decidedById           String?
+  decisionNote          String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  program               CertProgram           @relation(fields: [programId], references: [id])
+  level                 CertLevel             @relation(fields: [levelId], references: [id])
+  applicant             User                  @relation("CertApplicant", fields: [applicantId], references: [id], onDelete: Cascade)
+  decidedBy             User?                 @relation("CertDecider", fields: [decidedById], references: [id])
+  renewsCertification   Certification?        @relation("CertRenewal", fields: [renewsCertificationId], references: [id], onDelete: SetNull)
+  responses             CertResponse[]
+  reviews               CertReview[]
+  messages              CertMessage[]
+  certification         Certification?        @relation("CertIssued")
+
+  @@index([applicantId])
+  @@index([status])
+}
+
+model CertResponse {
+  id            String          @id @default(cuid())
+  applicationId String
+  criterionId   String
+  narrative     String          @default("")
+  evidence      String[]
+  updatedAt     DateTime        @updatedAt
+  application   CertApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  criterion     CertCriterion   @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, criterionId])
+}
+
+model CertReview {
+  id             String              @id @default(cuid())
+  applicationId  String
+  reviewerId     String
+  recommendation CertRecommendation?
+  comments       String              @default("")
+  submittedAt    DateTime?
+  assignedAt     DateTime            @default(now())
+  application    CertApplication     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewer       User                @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  scores         CertReviewScore[]
+
+  @@unique([applicationId, reviewerId])
+}
+
+model CertReviewScore {
+  id          String        @id @default(cuid())
+  reviewId    String
+  criterionId String
+  rating      CertRating
+  comment     String        @default("")
+  review      CertReview    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  criterion   CertCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, criterionId])
+}
+
+model CertMessage {
+  id            String          @id @default(cuid())
+  applicationId String
+  authorId      String
+  body          String
+  internal      Boolean         @default(false) // visible to reviewers and admins only
+  createdAt     DateTime        @default(now())
+  application   CertApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  author        User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
+
+model Certification {
+  id              String            @id @default(cuid())
+  code            String            @unique // public verification code
+  programId       String
+  levelId         String
+  holderId        String?
+  holderName      String
+  holderEmail     String?
+  centerName      String?
+  institution     String?
+  issuedAt        DateTime
+  expiresAt       DateTime? // null = lifetime
+  revokedAt       DateTime?
+  revokeReason    String?
+  isRenewal       Boolean           @default(false)
+  showInDirectory Boolean           @default(true)
+  reminderStage   Int               @default(0) // smallest "days before expiry" reminder already sent (0 = none)
+  applicationId   String?           @unique
+  createdAt       DateTime          @default(now())
+  program         CertProgram       @relation(fields: [programId], references: [id])
+  level           CertLevel         @relation(fields: [levelId], references: [id])
+  holder          User?             @relation(fields: [holderId], references: [id], onDelete: SetNull)
+  application     CertApplication?  @relation("CertIssued", fields: [applicationId], references: [id], onDelete: SetNull)
+  renewals        CertApplication[] @relation("CertRenewal")
+
+  @@index([holderId])
+  @@index([expiresAt])
 }

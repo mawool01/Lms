@@ -33,7 +33,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHeader title="Administration" subtitle="Manage people, roles and the platform." actions={<Link href="/courses" className="btn-secondary">All courses</Link>} />
+      <PageHeader title="Administration" subtitle="Manage people, roles and the platform." actions={<><Link href="/admin/certifications" className="btn-primary">🎖️ Certifications</Link><Link href="/courses" className="btn-secondary">All courses</Link></>} />
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-6">
         <Stat label="Students" value={roleCount("STUDENT")} />
         <Stat label="Teachers" value={roleCount("TEACHER")} />

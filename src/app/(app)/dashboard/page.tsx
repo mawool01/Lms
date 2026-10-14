@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { progressByCourse } from "@/lib/grades";
 import { levelFor, totalPoints } from "@/lib/gamification";
 import { activitySeries } from "@/lib/analytics";
+import { CertDashboardAlerts } from "@/components/cert/dashboard-alerts";
 import { CourseCard } from "@/components/course/course-card";
 import { ActivityChart } from "@/components/analytics/charts";
 import { LocalTime } from "@/components/forms";
@@ -21,6 +22,7 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold sm:text-3xl">Welcome back, {firstName} 👋</h1>
         <p className="muted">Here&apos;s what&apos;s happening in your learning community.</p>
       </div>
+      <CertDashboardAlerts user={user} />
       {user.role === "STUDENT" ? <StudentDashboard user={user} /> : <StaffDashboard user={user} />}
     </>
   );

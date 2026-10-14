@@ -7,7 +7,7 @@ import { blobMode } from "@/lib/blob";
 const MAX_BYTES = 500 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/*", "video/*", "audio/*", "application/pdf", "application/*", "text/*"];
 /** Browser uploads may only write under these folders. */
-const ALLOWED_PREFIXES = ["uploads/", "scorm-uploads/"];
+const ALLOWED_PREFIXES = ["uploads/", "scorm-uploads/", "cert-evidence/"];
 
 async function requireUploader() {
   const user = await getCurrentUser();

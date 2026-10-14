@@ -12,7 +12,7 @@ export type UploadedFile = { url: string; pathname: string; access: "public" | "
  */
 export async function uploadToBlob(
   file: File,
-  folder: "uploads" | "scorm-uploads",
+  folder: "uploads" | "scorm-uploads" | "cert-evidence",
   config: NonNullable<BlobClientConfig>,
   onProgress?: (percent: number) => void,
 ): Promise<UploadedFile> {

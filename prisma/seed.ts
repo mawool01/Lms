@@ -5,6 +5,7 @@
  */
 import { PrismaClient, type Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { DEFAULT_PROGRAMS } from "../src/lib/certifications/defaults";
 
 const db = new PrismaClient();
 const DAY = 24 * 3600 * 1000;
@@ -285,6 +286,32 @@ async function main() {
     const total = (await db.pointEvent.aggregate({ where: { userId: s.id }, _sum: { points: true } }))._sum.points ?? 0;
     if (total >= 250) await badge(s.id, "rising-star");
   }
+
+  // ─── Certifications ──────────────────────────────────────────────────────
+  for (const [pi, p] of DEFAULT_PROGRAMS.entries()) {
+    const program = await db.certProgram.create({
+      data: {
+        key: p.key, name: p.name, kind: p.kind, description: p.description, position: pi,
+        initialValidityMonths: p.initialValidityMonths, renewalValidityMonths: p.renewalValidityMonths,
+        levels: { create: p.levels.map((l, i) => ({ name: l.name, description: l.description, lifetime: !!l.lifetime, position: i })) },
+      },
+    });
+    await db.certCriterion.createMany({
+      data: p.criteria.map((c, i) => ({ programId: program.id, section: c.section, title: c.title, guidance: c.guidance, evidenceRequired: c.evidenceRequired ?? true, position: i })),
+    });
+  }
+  await db.user.updateMany({ where: { id: { in: [admin.id, tRivera.id, tChen.id] } }, data: { certReviewer: true } });
+  const lclc = await db.certProgram.findUniqueOrThrow({ where: { key: "lclc" }, include: { levels: { orderBy: { position: "asc" } } } });
+  const center = await db.certProgram.findUniqueOrThrow({ where: { key: "lc-certification" }, include: { levels: { orderBy: { position: "asc" } } } });
+  const monthsAgo = (m: number) => new Date(Date.now() - m * 30 * DAY);
+  await db.certification.createMany({
+    data: [
+      { code: "ICL-DEMO-RVRA", programId: lclc.id, levelId: lclc.levels[2].id, holderId: tRivera.id, holderName: tRivera.name, holderEmail: tRivera.email, institution: "ICLCA Demo College", issuedAt: monthsAgo(6), expiresAt: daysFromNow(540) },
+      { code: "ICL-DEMO-CHEN", programId: lclc.id, levelId: lclc.levels[1].id, holderId: tChen.id, holderName: tChen.name, holderEmail: tChen.email, institution: "ICLCA Demo College", issuedAt: monthsAgo(23), expiresAt: daysFromNow(20) },
+      { code: "ICL-DEMO-LIFE", programId: lclc.id, levelId: lclc.levels[3].id, holderName: "Dr. Pat Morgan", holderEmail: "pat.morgan@example.edu", institution: "Example University", issuedAt: monthsAgo(60), expiresAt: null },
+      { code: "ICL-DEMO-CNTR", programId: center.id, levelId: center.levels[1].id, holderId: tRivera.id, holderName: tRivera.name, holderEmail: tRivera.email, centerName: "Academic Success Center", institution: "ICLCA Demo College", issuedAt: monthsAgo(12), expiresAt: daysFromNow(4 * 365) },
+    ],
+  });
 
   console.log("Seeded demo data. Sign in with e.g. admin@iclca.test / rivera@iclca.test / sam@iclca.test — password: password123");
 }
