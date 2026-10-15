@@ -53,6 +53,31 @@ export function ActionForm({
   );
 }
 
+/** A plain form that asks before submitting — for actions that redirect or return nothing. */
+export function ConfirmForm({
+  action,
+  confirm,
+  children,
+  className,
+}: {
+  action: () => Promise<void>;
+  confirm: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <form
+      action={action}
+      className={className}
+      onSubmit={(e) => {
+        if (!window.confirm(confirm)) e.preventDefault();
+      }}
+    >
+      {children}
+    </form>
+  );
+}
+
 /** datetime-local input that submits an ISO string, so the server stores the user's local time correctly. */
 export function DateTimeInput({ name, defaultValue, className }: { name: string; defaultValue?: string | null; className?: string }) {
   const [local, setLocal] = useState("");

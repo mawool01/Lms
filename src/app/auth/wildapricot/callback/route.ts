@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { SESSION_COOKIE, SESSION_MAX_AGE, signSession, verifySession } from "@/lib/session";
 import { WaError, waDisplayName, waEnabled, waFetchContact } from "@/lib/wildapricot";
+import { syncWaEnrollments } from "@/lib/wildapricot-sync";
 
 const STATE_COOKIE = "wa_oauth";
 
@@ -89,5 +90,18 @@ export async function GET(req: NextRequest) {
     maxAge: SESSION_MAX_AGE,
   });
   res.cookies.delete({ name: STATE_COOKIE, path: "/auth/wildapricot" });
+
+  // Enroll them in courses linked to Wild Apricot events they're registered for.
+  // after() runs once the redirect has been sent, so a slow or broken Wild Apricot
+  // can never delay or fail the sign-in itself. Grants only: removing access is the
+  // nightly job's business, since one contact's registrations aren't enough to
+  // conclude anyone else's have gone.
+  after(async () => {
+    try {
+      await syncWaEnrollments({ trigger: "SIGN_IN", waContactId: contact.id, allowRevoke: false });
+    } catch (e) {
+      console.error("Wild Apricot enrollment sync after sign-in failed", e);
+    }
+  });
   return res;
 }

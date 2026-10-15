@@ -6,6 +6,7 @@ import { adminCreateUser, adminImportUsers, adminResetPassword, adminSetRole, ad
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { Avatar, Card, PageHeader, Pill, Stat } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
+import { waAdminEnabled } from "@/lib/wildapricot";
 
 export const metadata = { title: "Administration" };
 
@@ -34,7 +35,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHeader title="Administration" subtitle="Manage people, roles and the platform." actions={<><Link href="/admin/certifications" className="btn-primary">🎖️ Certifications</Link><Link href="/admin/branding" className="btn-secondary">🎨 Branding</Link><Link href="/admin/portfolio" className="btn-secondary">🗂️ Portfolio verification{pendingVerifications ? ` (${pendingVerifications})` : ""}</Link><Link href="/courses" className="btn-secondary">All courses</Link></>} />
+      <PageHeader title="Administration" subtitle="Manage people, roles and the platform." actions={<><Link href="/admin/certifications" className="btn-primary">🎖️ Certifications</Link><Link href="/admin/branding" className="btn-secondary">🎨 Branding</Link><Link href="/admin/portfolio" className="btn-secondary">🗂️ Portfolio verification{pendingVerifications ? ` (${pendingVerifications})` : ""}</Link>{waAdminEnabled() && <Link href="/admin/wild-apricot" className="btn-secondary">🌿 Wild Apricot</Link>}<Link href="/courses" className="btn-secondary">All courses</Link></>} />
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-6">
         <Stat label="Students" value={roleCount("STUDENT")} />
         <Stat label="Teachers" value={roleCount("TEACHER")} />

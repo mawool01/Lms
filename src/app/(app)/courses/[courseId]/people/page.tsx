@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { requireCourseMember } from "@/lib/permissions";
 import { addStudents, removeStudent } from "@/lib/actions/courses";
 import { startConversation } from "@/lib/actions/community";
-import { ActionForm, SubmitButton } from "@/components/forms";
+import { ActionForm, ConfirmForm, SubmitButton } from "@/components/forms";
 import { Avatar, Card, Pill } from "@/components/ui";
 
 export default async function PeoplePage({ params }: { params: Promise<{ courseId: string }> }) {
@@ -16,6 +16,7 @@ export default async function PeoplePage({ params }: { params: Promise<{ courseI
     include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
     orderBy: { user: { name: "asc" } },
   });
+  const waLinked = await db.courseWaEvent.count({ where: { courseId, active: true } });
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -29,19 +30,35 @@ export default async function PeoplePage({ params }: { params: Promise<{ courseI
               <form action={startConversation.bind(null, course.teacher.id)}><button className="btn-ghost btn-sm">💬 Message</button></form>
             )}
           </li>
-          {enrollments.map(({ user: s, enrolledAt }) => (
+          {enrollments.map(({ user: s, enrolledAt, source }) => (
             <li key={s.id} className="flex items-center gap-3 py-3">
               <Avatar name={s.name} url={s.avatarUrl} />
               <div className="min-w-0 flex-1">
                 <Link href={`/users/${s.id}`} className="font-medium hover:underline">{s.name}</Link>
-                {canManage && <p className="muted truncate text-xs">{s.email} · joined {enrolledAt.toLocaleDateString("en-US")}</p>}
+                {canManage && (
+                  <p className="muted truncate text-xs">
+                    {s.email} · joined {enrolledAt.toLocaleDateString("en-US")}
+                    {source === "WILD_APRICOT" && " · via Wild Apricot"}
+                  </p>
+                )}
               </div>
+              {canManage && source === "WILD_APRICOT" && <Pill tone="green">🌿</Pill>}
               {s.id !== user.id && (
                 <form action={startConversation.bind(null, s.id)}><button className="btn-ghost btn-sm">💬<span className="hidden sm:inline"> Message</span></button></form>
               )}
-              {canManage && (
-                <form action={removeStudent.bind(null, courseId, s.id)}><button className="btn-ghost btn-sm text-red-600" title="Remove from course">✕</button></form>
-              )}
+              {canManage &&
+                (source === "WILD_APRICOT" ? (
+                  <ConfirmForm
+                    action={removeStudent.bind(null, courseId, s.id)}
+                    confirm={`${s.name} is enrolled through a Wild Apricot registration. Removing them here is temporary — the next sync will add them back unless you unlink the event or cancel their registration in Wild Apricot. Remove anyway?`}
+                  >
+                    <button className="btn-ghost btn-sm text-red-600" title="Remove from course">✕</button>
+                  </ConfirmForm>
+                ) : (
+                  <form action={removeStudent.bind(null, courseId, s.id)}>
+                    <button className="btn-ghost btn-sm text-red-600" title="Remove from course">✕</button>
+                  </form>
+                ))}
             </li>
           ))}
         </ul>
@@ -53,6 +70,13 @@ export default async function PeoplePage({ params }: { params: Promise<{ courseI
             <p className="muted text-xs">Enter email addresses separated by commas or new lines. Students need an account first.</p>
             <SubmitButton>Enroll</SubmitButton>
           </ActionForm>
+          {waLinked > 0 && (
+            <p className="muted mt-4 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
+              🌿 {waLinked === 1 ? "A Wild Apricot event is" : `${waLinked} Wild Apricot events are`} linked to this course, so
+              registrants are enrolled automatically. People you add here are kept separate and never removed by that sync —{" "}
+              <Link href={`/courses/${courseId}/settings`} className="underline">manage the links</Link>.
+            </p>
+          )}
         </Card>
       )}
     </div>
