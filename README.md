@@ -7,7 +7,7 @@ A full-featured LMS for ICLCA built with **Next.js 15 (App Router)**, **PostgreS
 | Area | What's included |
 |---|---|
 | **Wild Apricot sign-on** | "Sign in with Wild Apricot" for ICLCA members and contacts (OAuth). New contacts get an account automatically; Wild Apricot account administrators become LMS admins; membership level and status sync at each sign-in and show on profiles and in Admin. Existing LMS accounts connect from Profile → "Connect Wild Apricot" (never taken over by email match). Email/password login remains as a fallback. |
-| **Wild Apricot event sync** | Link a Wild Apricot event to a course (Settings → Wild Apricot registrations, or Admin → Wild Apricot) and everyone registered for it is enrolled automatically — paid or unpaid. A course can be fed by several events, so a workshop you run each term stays one course. The sync runs nightly, on demand, and when someone signs in with Wild Apricot; it only ever removes access it granted itself, so manual and self-enrollments are safe, and grades and submissions are never touched. Registrations with no LMS account are listed for an admin. |
+| **Wild Apricot enrollment sync** | Link a course to a Wild Apricot **event**, **member group** or **membership level** (a course's Settings tab, or Admin → Wild Apricot) and everyone it covers is enrolled automatically: an event's registrants paid or unpaid, a group's current members, or everyone holding an active membership level. A course can have several links, so a workshop you run each term stays one course. The sync runs nightly, on demand, and when someone signs in with Wild Apricot. Losing cover removes the access again — immediately for groups and levels, and for events until 30 days after they end. It only ever removes access it granted itself, so manual and self-enrollments are safe, and grades and submissions are never touched. People with no LMS account are listed for an admin. |
 | **Portfolio / transcript** | Every user gets a shareable portfolio at `/p/<their-name>` with positions, presentations, publications, service, awards and professional development (with files and links), plus automatic ICLCA records: certifications, completed courses (no grades) and badges. Owners choose Public / Unlisted / Private, can hide or reorder items, and request ICLCA verification; admins verify from Admin → Portfolio verification. Includes a downloadable transcript PDF and print layout. |
 | **Branding** | Admin → Branding: site name, short name, organization name (certificates/transcripts), tagline, sign-in page message, primary & accent colors (presets, auto-generated shades kept readable), logo and favicon upload, with live preview. Applies across the app, public pages, PDFs and emails. |
 | **User profiles & roles** | Admin / Teacher / Student roles; profile (name, photo, bio); preferences (light/dark/system theme, leaderboard visibility); password change; "your permissions" panel; public profile pages. Admins create users, bulk-import via CSV, assign roles, reset passwords and deactivate accounts. The first account to sign up becomes the admin. |
@@ -41,12 +41,20 @@ A full-featured LMS for ICLCA built with **Next.js 15 (App Router)**, **PostgreS
 
    Then set `WILDAPRICOT_API_KEY` in Vercel (and `CRON_SECRET`, which enables the nightly job in `vercel.json`). Link events to courses from **Admin → Wild Apricot** or a course's **Settings** tab.
 
+   What you can link, and what it covers:
+
+   | Link | Who gets the course |
+   |---|---|
+   | **Event** | Everyone registered, paid or unpaid |
+   | **Member group** | Everyone currently in the group (archived contacts excluded) |
+   | **Membership level** | Everyone whose membership is active at that level |
+
    How it behaves, so there are no surprises:
-   - Any registration grants access, paid or unpaid.
    - Enrollments a teacher or student made by hand are never removed by the sync — only rows it created itself.
-   - Cancelling a registration removes that access, but only while the event is upcoming or finished less than 30 days ago, so archiving old Wild Apricot data can't strip access to a course someone already completed.
+   - Losing cover removes the access again. Groups and levels are live entitlements, so leaving a group or lapsing takes the course away. An event stops mirroring cancellations 30 days after it ends, so archiving old Wild Apricot data can't strip access to a course someone already completed. Each link also has its own "keep access" switch.
+   - Unlinking leaves everyone enrolled — it stops future syncing rather than revoking.
    - If Wild Apricot can't be reached, that course's roster is left alone rather than emptied; an unusually large removal is reported for confirmation instead of applied.
-   - Registrants with no LMS account are listed under Admin → Wild Apricot; create their accounts and the next sync enrolls them.
+   - People with no LMS account are listed under Admin → Wild Apricot; create their accounts and the next sync enrolls them.
    - Use **Preview** before the first real run.
 7. **Visit the site and sign up** — the first account becomes the administrator. Then add teachers and students from the **Admin** page.
 
@@ -73,7 +81,7 @@ src/app/(auth)/            Sign in / sign up
 src/app/(app)/             Authenticated app (dashboard, courses, messages, leaderboard, profile, admin)
 src/app/api/               Gradebook CSV export, file upload tokens, nightly cron jobs
 src/lib/                   Auth, permissions, grading, analytics, gamification, server actions
-src/lib/wildapricot*.ts    Sign-on, event/registration API client, enrollment sync and its rules
+src/lib/wildapricot*.ts    Sign-on, admin API client, enrollment sync and its removal rules
 src/components/            UI, lesson editor & renderer, charts, chat
 scripts/wa-dump.mjs        Dumps real Wild Apricot API payloads (read-only, needs an API key)
 scripts/wa-revocation-check.ts  Checks the sync's revocation rules (no database needed)
@@ -86,4 +94,6 @@ scripts/wa-revocation-check.ts  Checks the sync's revocation rules (no database 
 - SCORM: packages are served from the app's own domain (required so content can reach the SCORM API), so only upload packages from trusted authors — teachers and admins only can upload. Multi-SCO packages launch their first SCO; SCORM 2004 sequencing/navigation rules are not enforced. Packages up to 500 MB.
 - Course emails (announcements, grades) aren't sent yet; certification emails use Resend when configured.
 - Certification programs are seeded with placeholder requirements (Admin → Certifications → Programs & criteria → "Load ICLCA defaults"); edit them to match ICLCA's current official criteria.
-- Wild Apricot event sync: **before relying on the removal side**, run `WILDAPRICOT_API_KEY=… node scripts/wa-dump.mjs <eventId>` against the real site. Wild Apricot doesn't document its registration `Status` values, so `WA_INELIGIBLE_STATUSES` in `src/lib/wildapricot-rules.ts` ships empty — the dump shows whether a cancelled registration keeps a status or leaves the list altogether, which decides whether anything needs adding there. Granting access works either way. Vercel's Hobby plan allows only two cron jobs, and this feature uses the second.
+- Wild Apricot sync: **before relying on the removal side**, run `WILDAPRICOT_API_KEY=… node scripts/wa-dump.mjs <eventId>` against the real site. Two things aren't settled from the docs alone. Wild Apricot doesn't document its registration `Status` values, so `WA_INELIGIBLE_STATUSES` in `src/lib/wildapricot-rules.ts` ships empty — the dump shows whether a cancelled registration keeps a status or leaves the list altogether, which decides whether anything needs adding. And the contacts filter the **membership level** links use (`'Membership level ID' eq …`) is the one query not confirmed against a real tenant; if it's wrong those links report the error and revoke nobody, and the dump prints what the filter actually returns. Events and groups use documented endpoints. Granting access works either way.
+- `npx tsx scripts/wa-revocation-check.ts` checks the sync's removal rules without needing a database — worth running after touching `src/lib/wildapricot-rules.ts`.
+- Vercel's Hobby plan allows only two cron jobs, and this feature uses the second.

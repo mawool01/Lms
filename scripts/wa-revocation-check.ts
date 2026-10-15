@@ -3,7 +3,7 @@
 // network: run it after touching src/lib/wildapricot-rules.ts.
 //
 //   npx tsx scripts/wa-revocation-check.ts
-import { computeRevocations, isInRevokeWindow, type WaRevocationInput } from "../src/lib/wildapricot-rules";
+import { computeRevocations, isInRevokeWindow, isLinkRetired, isLinkRevocable, type WaRevocationInput } from "../src/lib/wildapricot-rules";
 
 let pass = 0;
 let fail = 0;
@@ -23,13 +23,13 @@ function check(name: string, got: unknown, want: unknown) {
 const base = (over: Partial<WaRevocationInput> = {}): WaRevocationInput => ({
   current: [],
   desiredUserIds: new Set<string>(),
-  revocableEventIds: new Set<number>([10]),
+  revocableLinkIds: new Set<string>(["link-a"]),
   allLinksFetched: true,
   ...over,
 });
 
-const users = (n: number, eventId: number | null = 10) =>
-  Array.from({ length: n }, (_, i) => ({ userId: `u${i}`, waEventId: eventId }));
+const users = (n: number, waLinkId: string | null = "link-a") =>
+  Array.from({ length: n }, (_, i) => ({ userId: `u${i}`, waLinkId }));
 
 console.log("\ncomputeRevocations");
 
@@ -61,20 +61,20 @@ check(
 
 // Manual rows never reach this function, but a synced row with no event must not be touched.
 check(
-  "enrollment with no waEventId is never revoked",
+  "enrollment with no waLinkId is never revoked",
   computeRevocations(base({ current: users(3, null) })),
   { revoke: [], skipped: null },
 );
 
 check(
-  "enrollment from a non-revocable event is kept",
-  computeRevocations(base({ current: users(3, 99) })),
+  "enrollment from a non-revocable link is kept",
+  computeRevocations(base({ current: users(3, "link-other") })),
   { revoke: [], skipped: null },
 );
 
 check(
-  "no revocable events at all is a no-op",
-  computeRevocations(base({ current: users(3), revocableEventIds: new Set() })),
+  "no revocable links at all is a no-op",
+  computeRevocations(base({ current: users(3), revocableLinkIds: new Set() })),
   { revoke: [], skipped: null },
 );
 
@@ -116,6 +116,29 @@ check("an event that ended 5 days ago is revocable", isInRevokeWindow(new Date("
 check("an event that ended 29 days ago is revocable", isInRevokeWindow(new Date("2026-09-15T12:00:00Z"), now), true);
 check("an event that ended 31 days ago is not", isInRevokeWindow(new Date("2026-09-13T00:00:00Z"), now), false);
 check("a 2024 event is not", isInRevokeWindow(new Date("2024-03-01T00:00:00Z"), now), false);
+
+console.log("\nisLinkRevocable — groups and levels are live entitlements, events expire");
+const old = new Date("2024-03-01T00:00:00Z");
+const soon = new Date("2026-12-01T00:00:00Z");
+
+check("upcoming event: revocable", isLinkRevocable({ kind: "EVENT", revoke: true, endsAt: soon }, now), true);
+check("long-past event: not revocable", isLinkRevocable({ kind: "EVENT", revoke: true, endsAt: old }, now), false);
+check("group: revocable", isLinkRevocable({ kind: "GROUP", revoke: true, endsAt: null }, now), true);
+check("level: revocable", isLinkRevocable({ kind: "LEVEL", revoke: true, endsAt: null }, now), true);
+// A group carrying a stale end date must not inherit the event expiry rule.
+check("group with a past end date: still revocable", isLinkRevocable({ kind: "GROUP", revoke: true, endsAt: old }, now), true);
+check("level with a past end date: still revocable", isLinkRevocable({ kind: "LEVEL", revoke: true, endsAt: old }, now), true);
+// The per-link switch wins over everything.
+check("revoke off, event: not revocable", isLinkRevocable({ kind: "EVENT", revoke: false, endsAt: soon }, now), false);
+check("revoke off, group: not revocable", isLinkRevocable({ kind: "GROUP", revoke: false, endsAt: null }, now), false);
+check("revoke off, level: not revocable", isLinkRevocable({ kind: "LEVEL", revoke: false, endsAt: null }, now), false);
+
+console.log("\nisLinkRetired — only events go dormant");
+check("long-past event retires", isLinkRetired({ kind: "EVENT", endsAt: old }, now), true);
+check("upcoming event doesn't", isLinkRetired({ kind: "EVENT", endsAt: soon }, now), false);
+check("undated event doesn't", isLinkRetired({ kind: "EVENT", endsAt: null }, now), false);
+check("a group never retires", isLinkRetired({ kind: "GROUP", endsAt: old }, now), false);
+check("a level never retires", isLinkRetired({ kind: "LEVEL", endsAt: old }, now), false);
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

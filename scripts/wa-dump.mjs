@@ -1,13 +1,17 @@
 // Wild Apricot API discovery script.
 //
-// The event-registration sync has to make two decisions this script answers:
-//   1. Which `Status` values mean "this person isn't coming"? (undocumented enum)
+// The sync has to make decisions this script answers against the real tenant:
+//   1. Which registration `Status` values mean "this person isn't coming"?
+//      (the enum isn't documented)
 //   2. Does a cancelled registration stay in the list, or disappear from it?
-// It also confirms the collection wrappers, the date field names and that
-// $top/$skip paging works on this tenant.
+//   3. Does a member group really return ContactIds?
+//   4. Does the membership-level contacts filter work, and does it come back
+//      asynchronously?
+// It also confirms the collection wrappers, date field names and $top/$skip
+// paging on this tenant.
 //
 // Usage:
-//   WILDAPRICOT_API_KEY=xxxx node scripts/wa-dump.mjs                 # list recent events
+//   WILDAPRICOT_API_KEY=xxxx node scripts/wa-dump.mjs                 # events, groups, levels
 //   WILDAPRICOT_API_KEY=xxxx node scripts/wa-dump.mjs <eventId>       # dump that event's registrations
 //   WILDAPRICOT_API_KEY=xxxx node scripts/wa-dump.mjs <eventId> <contactId>
 //
@@ -19,7 +23,8 @@ const API_URL = (process.env.WILDAPRICOT_API_URL ?? "https://api.wildapricot.org
 
 if (!API_KEY) {
   console.error("\n✖ Set WILDAPRICOT_API_KEY first.");
-  console.error("  In Wild Apricot: Settings → Integration → API keys → Authorize application → Server application.\n");
+  console.error("  Wild Apricot admin view → Apps → Authorized applications → your server application:");
+  console.error("  the API key is shown under the Application name field, above the client id/secret.\n");
   process.exit(1);
 }
 
@@ -115,7 +120,7 @@ if (eventIdArg) {
     line(`  ${allRows.length} registrations, status breakdown:`);
     for (const [status, n] of [...counts].sort((a, b) => b[1] - a[1])) line(`    ${String(status).padEnd(24)} ${n}`);
     line("\n  → Put any status meaning \"not coming\" into WA_INELIGIBLE_STATUSES");
-    line("    in src/lib/wildapricot-sync.ts.");
+    line("    in src/lib/wildapricot-rules.ts.");
     line("  → Now cancel one registration in Wild Apricot and re-run: if it vanishes");
     line("    from this list, revocation already works and the deny list can stay empty.");
 
@@ -129,8 +134,70 @@ if (eventIdArg) {
   }
 }
 
+rule("6. GET /membergroups — member groups");
+const groups = await get(t, "/membergroups", { $top: 100, $skip: 0 });
+if (groups) {
+  const { kind, rows } = shape(groups, "MemberGroups");
+  line(`  response shape: ${kind}`);
+  line(`  groups:         ${rows.length}`);
+  if (rows[0]) line(`  first group keys: ${Object.keys(rows[0]).join(", ")}`);
+  for (const g of rows.slice(0, 15)) line(`    ${String(g.Id).padEnd(10)} ${String(g.Name ?? "").slice(0, 40).padEnd(42)} ${g.ContactsCount ?? "?"} members`);
+  if (rows[0]) {
+    const gid = rows[0].Id;
+    line(`\n  --- GET /membergroups/${gid}?includeArchivedMembers=false ---`);
+    const one = await get(t, `/membergroups/${gid}`, { includeArchivedMembers: "false" });
+    const g = Array.isArray(one) ? one[0] : one;
+    if (g) {
+      line(`  keys: ${Object.keys(g).join(", ")}`);
+      line(`  ContactIds present: ${Array.isArray(g.ContactIds) ? `YES (${g.ContactIds.length})` : "NO — the sync needs this"}`);
+      if (Array.isArray(g.ContactIds)) line(`  first few ids: ${g.ContactIds.slice(0, 8).join(", ")}`);
+    }
+  }
+}
+
+rule("7. GET /membershiplevels — membership levels");
+const levels = await get(t, "/membershiplevels", { $top: 100, $skip: 0 });
+let firstLevelId = null;
+if (levels) {
+  const { kind, rows } = shape(levels, "MembershipLevels");
+  line(`  response shape: ${kind}`);
+  line(`  levels:         ${rows.length}`);
+  if (rows[0]) {
+    line(`  first level keys: ${Object.keys(rows[0]).join(", ")}`);
+    firstLevelId = rows[0].Id;
+  }
+  for (const l of rows) line(`    ${String(l.Id).padEnd(10)} ${String(l.Name ?? "").slice(0, 40).padEnd(42)} ${l.Type ?? ""}`);
+}
+
+if (firstLevelId) {
+  rule(`8. GET /contacts?$filter='Membership level ID' eq ${firstLevelId} — the LEVEL path`);
+  line("  This is the one filter the sync uses that isn't confirmed against a real");
+  line("  tenant yet. If it errors, the level links will report that error and");
+  line("  revoke nobody — paste the output and the filter can be corrected.\n");
+  const contacts = await get(t, "/contacts", {
+    $filter: `'Membership level ID' eq ${firstLevelId}`,
+    $async: "false",
+    $top: 5,
+    $skip: 0,
+  });
+  if (contacts) {
+    const { kind, rows } = shape(contacts, "Contacts");
+    line(`  response shape: ${kind}`);
+    line(`  rows:           ${rows.length}`);
+    if (!Array.isArray(contacts) && contacts.State) line(`  State: ${contacts.State}  ResultId: ${contacts.ResultId ?? "(none)"} → async, the sync polls`);
+    if (rows[0]) {
+      line(`  first contact keys: ${Object.keys(rows[0]).join(", ")}`);
+      const statuses = new Map();
+      for (const c of rows) statuses.set(`${c.Status ?? "(null)"} / enabled=${c.MembershipEnabled}`, (statuses.get(`${c.Status ?? "(null)"} / enabled=${c.MembershipEnabled}`) ?? 0) + 1);
+      line("  status / MembershipEnabled seen:");
+      for (const [k, n] of statuses) line(`    ${String(k).padEnd(40)} ${n}`);
+      line("\n  → LAPSED_STATUSES in src/lib/wildapricot-admin.ts filters these.");
+    }
+  }
+}
+
 if (contactIdArg) {
-  rule(`6. GET /eventregistrations?contactId=${contactIdArg} — the sign-in path`);
+  rule(`9. GET /eventregistrations?contactId=${contactIdArg} — the sign-in path`);
   const mine = await get(t, "/eventregistrations", { contactId: contactIdArg, $top: 100, $skip: 0 });
   if (mine) {
     const { kind, rows } = shape(mine, "EventRegistrations");

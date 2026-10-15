@@ -1,9 +1,17 @@
 import "server-only";
-import type { WaSyncTrigger } from "@prisma/client";
+import type { WaLinkKind, WaSyncTrigger } from "@prisma/client";
 import { db } from "./db";
 import { WaApiError, waAdminEnabled } from "./wildapricot";
-import { type WaRegistration, waListContactRegistrations, waListEventRegistrations } from "./wildapricot-admin";
-import { REVOKE_GRACE_DAYS, computeRevocations, isEligibleRegistration, isInRevokeWindow } from "./wildapricot-rules";
+import {
+  type WaMember,
+  type WaRegistration,
+  registrationToMember,
+  waListContactRegistrations,
+  waListEventRegistrations,
+  waListGroupMembers,
+  waListLevelMembers,
+} from "./wildapricot-admin";
+import { REVOKE_GRACE_DAYS, computeRevocations, isEligibleRegistration, isLinkRetired, isLinkRevocable } from "./wildapricot-rules";
 
 export * from "./wildapricot-rules";
 
@@ -47,16 +55,17 @@ export type WaSyncChange = {
   userName: string;
   courseId: string;
   courseCode: string;
-  waEventId: number;
+  waLinkId: string | null;
   matchedBy?: "contact" | "email";
 };
 
 export type WaSyncUnmatched = {
-  waRegistrationId: number;
+  waRegistrationId: number | null;
   waContactId: number | null;
   name: string;
   email: string | null;
-  waEventId: number;
+  kind: WaLinkKind;
+  waId: number;
   courseId: string;
   courseCode: string;
   reason: "no-lms-account" | "no-contact-id";
@@ -81,25 +90,67 @@ export type WaSyncResult = {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function waSyncSummary(r: WaSyncResult): string {
-  if (!r.links) return "No Wild Apricot events are linked to courses yet.";
+  if (!r.links) return "Nothing in Wild Apricot is linked to a course yet.";
   const bits = [
-    `${r.registrations} registration${r.registrations === 1 ? "" : "s"} across ${r.links} event${r.links === 1 ? "" : "s"}`,
+    `${r.registrations} ${r.registrations === 1 ? "person" : "people"} across ${r.links} link${r.links === 1 ? "" : "s"}`,
     `enrolled ${r.enrolled.length}`,
   ];
   if (r.revoked.length) bits.push(`removed ${r.revoked.length}`);
   if (r.unmatched.length) bits.push(`${r.unmatched.length} with no LMS account`);
-  if (r.linksFailed) bits.push(`${r.linksFailed} event${r.linksFailed === 1 ? "" : "s"} failed`);
+  if (r.linksFailed) bits.push(`${r.linksFailed} link${r.linksFailed === 1 ? "" : "s"} failed`);
   return `${r.dryRun ? "Preview: would have " : ""}${bits.join(", ")}.`;
 }
 
 type LinkRow = {
   id: string;
   courseId: string;
-  waEventId: number;
+  kind: WaLinkKind;
+  waId: number;
   revoke: boolean;
   endsAt: Date | null;
   course: { id: string; code: string; title: string };
 };
+
+const KIND_LABELS: Record<WaLinkKind, string> = { EVENT: "event", GROUP: "group", LEVEL: "membership level" };
+
+/** Everyone a link currently covers, whichever kind it is. */
+async function fetchMembers(link: LinkRow): Promise<WaMember[]> {
+  if (link.kind === "GROUP") return waListGroupMembers(link.waId);
+  if (link.kind === "LEVEL") return waListLevelMembers(link.waId);
+  return (await waListEventRegistrations(link.waId)).filter(isEligibleRegistration).map(registrationToMember);
+}
+
+/**
+ * Fetches each link's members in turn, recording per-link success. Failures are
+ * isolated: one dead event or group must not abort the run, and — crucially —
+ * a link that failed is what stops its course's roster being touched.
+ */
+async function fetchEachLink(
+  links: LinkRow[],
+  fetched: Map<string, { members: WaMember[]; ok: boolean }>,
+  result: WaSyncResult,
+  narrow?: (members: WaMember[]) => WaMember[],
+) {
+  let n = 0;
+  for (const link of links) {
+    // Serialized on purpose, with a pause every 10 calls: nightly volume is a
+    // handful of links and being a polite API client matters more than speed.
+    if (n && n % 10 === 0) await sleep(100);
+    n++;
+    try {
+      const all = await fetchMembers(link);
+      fetched.set(link.id, { members: narrow ? narrow(all) : all, ok: true });
+    } catch (e) {
+      fetched.set(link.id, { members: [], ok: false });
+      result.ok = false;
+      result.linksFailed++;
+      const missing = e instanceof WaApiError && e.status === 404;
+      result.errors.push(
+        `${link.course.code} / ${KIND_LABELS[link.kind]} ${link.waId}: ${missing ? "no longer in Wild Apricot — unlink it" : errText(e)}`,
+      );
+    }
+  }
+}
 
 export async function syncWaEnrollments(opts: WaSyncOptions): Promise<WaSyncResult> {
   const startedAt = new Date();
@@ -125,16 +176,17 @@ export async function syncWaEnrollments(opts: WaSyncOptions): Promise<WaSyncResu
 
   // Not configured is "nothing to do", never an error: sign-in must not break.
   if (!waAdminEnabled()) {
-    result.errors.push("Wild Apricot registration sync isn't configured.");
+    result.errors.push("Wild Apricot sync isn't configured.");
     return done();
   }
 
-  const links: LinkRow[] = await db.courseWaEvent.findMany({
+  const links: LinkRow[] = await db.courseWaLink.findMany({
     where: { active: true, ...(opts.courseId ? { courseId: opts.courseId } : {}) },
     select: {
       id: true,
       courseId: true,
-      waEventId: true,
+      kind: true,
+      waId: true,
       revoke: true,
       endsAt: true,
       course: { select: { id: true, code: true, title: true } },
@@ -146,47 +198,48 @@ export async function syncWaEnrollments(opts: WaSyncOptions): Promise<WaSyncResu
   const allowRevoke = opts.allowRevoke ?? opts.trigger !== "SIGN_IN";
 
   // ── Fetch phase: read everything first, write nothing ──────────────────────
-  const fetched = new Map<string, { regs: WaRegistration[]; ok: boolean }>();
+  const fetched = new Map<string, { members: WaMember[]; ok: boolean }>();
 
   if (opts.waContactId) {
-    // One contact-scoped call is authoritative for that contact across every event.
-    let mine: WaRegistration[] = [];
-    let ok = true;
-    try {
-      mine = (await waListContactRegistrations(opts.waContactId)).filter(isEligibleRegistration);
-    } catch (e) {
-      ok = false;
-      result.ok = false;
-      result.errors.push(`contact ${opts.waContactId}: ${errText(e)}`);
-    }
-    for (const link of links) fetched.set(link.id, { regs: mine.filter((r) => r.eventId === link.waEventId), ok });
-    if (!ok) result.linksFailed = links.length;
-  } else {
-    let n = 0;
-    for (const link of links) {
-      // Serialized on purpose, with a pause every 10 calls: nightly volume is a
-      // handful of events and being a polite API client matters more than speed.
-      if (n && n % 10 === 0) await sleep(100);
-      n++;
+    // Sign-in path. One contact-scoped registration call covers every event
+    // link; group and level links still need their own fetch, but there are few
+    // of them and this runs after the response has been sent.
+    const eventLinks = links.filter((l) => l.kind === "EVENT");
+    if (eventLinks.length) {
+      let mine: WaRegistration[] = [];
+      let ok = true;
       try {
-        const regs = (await waListEventRegistrations(link.waEventId)).filter(isEligibleRegistration);
-        fetched.set(link.id, { regs, ok: true });
+        mine = (await waListContactRegistrations(opts.waContactId)).filter(isEligibleRegistration);
       } catch (e) {
-        fetched.set(link.id, { regs: [], ok: false });
+        ok = false;
         result.ok = false;
-        result.linksFailed++;
-        const missing = e instanceof WaApiError && e.status === 404;
-        result.errors.push(`${link.course.code} / event ${link.waEventId}: ${missing ? "no longer in Wild Apricot — unlink it" : errText(e)}`);
+        result.linksFailed += eventLinks.length;
+        result.errors.push(`contact ${opts.waContactId}: ${errText(e)}`);
+      }
+      // Split the one response per event link, keeping each registration's own
+      // event id — so a contact registered for event A isn't credited with B.
+      for (const link of eventLinks) {
+        const forLink = mine.filter((r) => r.eventId === link.waId).map(registrationToMember);
+        fetched.set(link.id, { members: ok ? forLink : [], ok });
       }
     }
+    await fetchEachLink(
+      links.filter((l) => l.kind !== "EVENT"),
+      fetched,
+      result,
+      // Only this contact matters on the sign-in path.
+      (members) => members.filter((m) => m.contactId === opts.waContactId),
+    );
+  } else {
+    await fetchEachLink(links, fetched, result);
   }
 
-  result.registrations = [...fetched.values()].reduce((s, f) => s + f.regs.length, 0);
+  result.registrations = [...fetched.values()].reduce((s, f) => s + f.members.length, 0);
 
   // ── Resolve phase: map Wild Apricot contacts to LMS users in two queries ──
-  const allRegs = links.flatMap((l) => (fetched.get(l.id)?.regs ?? []).map((r) => ({ link: l, reg: r })));
-  const contactIds = [...new Set(allRegs.map(({ reg }) => reg.contactId).filter((id): id is number => !!id))];
-  const emails = [...new Set(allRegs.map(({ reg }) => reg.email).filter((e): e is string => !!e))];
+  const covered = links.flatMap((l) => (fetched.get(l.id)?.members ?? []).map((m) => ({ link: l, member: m })));
+  const contactIds = [...new Set(covered.map(({ member }) => member.contactId).filter((id): id is number => !!id))];
+  const emails = [...new Set(covered.map(({ member }) => member.email).filter((e): e is string => !!e))];
 
   const byContact = new Map<number, { id: string; name: string }>();
   if (contactIds.length) {
@@ -212,34 +265,43 @@ export async function syncWaEnrollments(opts: WaSyncOptions): Promise<WaSyncResu
   }
 
   // ── Grant phase ───────────────────────────────────────────────────────────
-  type Want = { userId: string; userName: string; waEventId: number; waRegistrationId: number; matchedBy: "contact" | "email" };
+  type Want = {
+    userId: string;
+    userName: string;
+    waLinkId: string;
+    waRegistrationId: number | null;
+    matchedBy: "contact" | "email";
+  };
   const wanted = new Map<string, Map<string, Want>>(); // courseId → userId → want
 
-  for (const { link, reg } of allRegs) {
-    const viaContact = reg.contactId ? byContact.get(reg.contactId) : undefined;
-    const viaEmail = !viaContact && reg.email ? byEmail.get(reg.email) : undefined;
+  for (const { link, member } of covered) {
+    const viaContact = member.contactId ? byContact.get(member.contactId) : undefined;
+    const viaEmail = !viaContact && member.email ? byEmail.get(member.email) : undefined;
     const user = viaContact ?? viaEmail;
     if (!user) {
       if (result.unmatched.length < DETAIL_CAP) {
         result.unmatched.push({
-          waRegistrationId: reg.id,
-          waContactId: reg.contactId,
-          name: reg.name,
-          email: reg.email,
-          waEventId: link.waEventId,
+          waRegistrationId: member.registrationId ?? null,
+          waContactId: member.contactId,
+          name: member.name,
+          email: member.email,
+          kind: link.kind,
+          waId: link.waId,
           courseId: link.courseId,
           courseCode: link.course.code,
-          reason: reg.contactId ? "no-lms-account" : "no-contact-id",
+          reason: member.contactId ? "no-lms-account" : "no-contact-id",
         });
       }
       continue;
     }
     const forCourse = wanted.get(link.courseId) ?? new Map<string, Want>();
+    // If several links cover the same person, whichever is seen last is recorded
+    // as the reason — they're all equally valid grounds for access.
     forCourse.set(user.id, {
       userId: user.id,
       userName: user.name,
-      waEventId: link.waEventId,
-      waRegistrationId: reg.id,
+      waLinkId: link.id,
+      waRegistrationId: member.registrationId ?? null,
       matchedBy: viaContact ? "contact" : "email",
     });
     wanted.set(link.courseId, forCourse);
@@ -255,7 +317,7 @@ export async function syncWaEnrollments(opts: WaSyncOptions): Promise<WaSyncResu
 
     const existing = await db.enrollment.findMany({
       where: { courseId },
-      select: { userId: true, source: true, waEventId: true },
+      select: { userId: true, source: true, waLinkId: true },
     });
     const existingByUser = new Map(existing.map((e) => [e.userId, e]));
 
@@ -269,27 +331,28 @@ export async function syncWaEnrollments(opts: WaSyncOptions): Promise<WaSyncResu
           userName: w.userName,
           courseId,
           courseCode: course.code,
-          waEventId: w.waEventId,
+          waLinkId: w.waLinkId,
           matchedBy: w.matchedBy,
         });
       }
       if (opts.dryRun) continue;
       await db.enrollment.upsert({
         where: { userId_courseId: { userId: w.userId, courseId } },
-        // update: {} would leave a synced row's event stale, so refresh those two
-        // columns only — never `source`, which is why MANUAL rows were skipped above.
-        update: { waEventId: w.waEventId, waRegistrationId: w.waRegistrationId },
-        create: { userId: w.userId, courseId, source: "WILD_APRICOT", waEventId: w.waEventId, waRegistrationId: w.waRegistrationId },
+        // update: {} would leave a synced row pointing at a stale link, so refresh
+        // those two columns only — never `source`, which is why MANUAL rows were
+        // skipped above.
+        update: { waLinkId: w.waLinkId, waRegistrationId: w.waRegistrationId },
+        create: { userId: w.userId, courseId, source: "WILD_APRICOT", waLinkId: w.waLinkId, waRegistrationId: w.waRegistrationId },
       });
     }
 
     // ── Revoke phase ────────────────────────────────────────────────────────
     if (!allowRevoke) continue;
-    const revocableEventIds = new Set(courseLinks.filter((l) => l.revoke && isInRevokeWindow(l.endsAt, now)).map((l) => l.waEventId));
+    const revocableLinkIds = new Set(courseLinks.filter((l) => isLinkRevocable(l, now)).map((l) => l.id));
     const { revoke, skipped } = computeRevocations({
-      current: existing.filter((e) => e.source === "WILD_APRICOT").map((e) => ({ userId: e.userId, waEventId: e.waEventId })),
+      current: existing.filter((e) => e.source === "WILD_APRICOT").map((e) => ({ userId: e.userId, waLinkId: e.waLinkId })),
       desiredUserIds: new Set(want.keys()),
-      revocableEventIds,
+      revocableLinkIds,
       allLinksFetched: courseLinks.every((l) => fetched.get(l.id)?.ok),
       force: opts.force,
     });
@@ -307,7 +370,7 @@ export async function syncWaEnrollments(opts: WaSyncOptions): Promise<WaSyncResu
         userName: names.get(userId) ?? userId,
         courseId,
         courseCode: course.code,
-        waEventId: row?.waEventId ?? 0,
+        waLinkId: row?.waLinkId ?? null,
       });
     }
     if (!opts.dryRun) {
@@ -328,21 +391,21 @@ function errText(e: unknown) {
 /** Per-link bookkeeping, the run record, and retiring links whose event is long over. */
 async function recordRun(
   links: LinkRow[],
-  fetched: Map<string, { regs: WaRegistration[]; ok: boolean }>,
+  fetched: Map<string, { members: WaMember[]; ok: boolean }>,
   result: WaSyncResult,
   now: Date,
 ) {
   for (const link of links) {
     const f = fetched.get(link.id);
-    const error = result.errors.find((e) => e.includes(`event ${link.waEventId}`)) ?? null;
+    const error = result.errors.find((e) => e.includes(`${KIND_LABELS[link.kind]} ${link.waId}`)) ?? null;
     // An event that ended more than the grace period ago stops being polled: it
     // can no longer change, and its learners keep the access it granted.
-    const retire = !isInRevokeWindow(link.endsAt, now);
-    await db.courseWaEvent.update({
+    const retire = isLinkRetired(link, now);
+    await db.courseWaLink.update({
       where: { id: link.id },
       data: {
         lastSyncedAt: now,
-        ...(f?.ok ? { lastCount: f.regs.length, lastError: null } : { lastError: error ?? "Wild Apricot couldn't be reached." }),
+        ...(f?.ok ? { lastCount: f.members.length, lastError: null } : { lastError: error ?? "Wild Apricot couldn't be reached." }),
         ...(retire ? { active: false, lastError: `Event ended over ${REVOKE_GRACE_DAYS} days ago — syncing stopped. Enrolled learners keep access.` } : {}),
       },
     });

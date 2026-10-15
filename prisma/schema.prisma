@@ -85,7 +85,7 @@ model User {
   portfolioVerified PortfolioItem[]           @relation("PortfolioVerifier")
   rubrics           Rubric[]
   checkResponses    KnowledgeCheckResponse[]
-  waEventLinks      CourseWaEvent[]           @relation("CourseWaEventAddedBy")
+  waLinksAdded      CourseWaLink[]            @relation("CourseWaLinkAddedBy")
 }
 
 // ─── Courses & content ───────────────────────────────────────────────────────
@@ -111,12 +111,12 @@ model Course {
   forumThreads  ForumThread[]
   announcements Announcement[]
   scormPackages ScormPackage[]
-  waEvents      CourseWaEvent[]
+  waLinks       CourseWaLink[]
 }
 
 enum EnrollmentSource {
   MANUAL // self-enrolled or added by a teacher/admin — the Wild Apricot sync never touches these
-  WILD_APRICOT // created by the Wild Apricot event-registration sync
+  WILD_APRICOT // created by the Wild Apricot sync (event, group or membership level)
 }
 
 model Enrollment {
@@ -125,14 +125,18 @@ model Enrollment {
   courseId         String
   enrolledAt       DateTime         @default(now())
   source           EnrollmentSource @default(MANUAL)
-  // Set only when source = WILD_APRICOT: the registration and event that granted access.
-  waRegistrationId Int?
-  waEventId        Int?
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course           Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  /// Set only when source = WILD_APRICOT: which link granted the access. Null
+  /// once that link is deleted, which also makes the row exempt from removal.
+  waLinkId         String?
+  waRegistrationId Int? // events only, informational
+
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  waLink CourseWaLink? @relation(fields: [waLinkId], references: [id], onDelete: SetNull)
 
   @@unique([userId, courseId])
   @@index([courseId, source])
+  @@index([waLinkId])
 }
 
 model Module {
@@ -772,7 +776,7 @@ model KnowledgeCheckResponse {
   @@index([lessonId])
 }
 
-// ─── Wild Apricot event sync ─────────────────────────────────────────────────
+// ─── Wild Apricot sync ───────────────────────────────────────────────────────
 
 enum WaSyncTrigger {
   CRON
@@ -780,33 +784,49 @@ enum WaSyncTrigger {
   SIGN_IN
 }
 
-/// Links one Wild Apricot event to one LMS course. A recurring workshop is one
-/// course fed by many events over time, so a course may have several of these.
-model CourseWaEvent {
-  id           String    @id @default(cuid())
-  courseId     String
-  waEventId    Int
-  waAccountId  Int? // the Wild Apricot account the event id belongs to (audit trail)
-  name         String    @default("") // event name as Wild Apricot last reported it
-  startsAt     DateTime?
-  endsAt       DateTime?
-  active       Boolean   @default(true) // untick to stop syncing, keeping enrollments
-  revoke       Boolean   @default(true) // remove access when a registration disappears
-  lastSyncedAt DateTime?
-  lastCount    Int? // registrations seen in the last successful sync
-  lastError    String?
-  addedById    String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  course       Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  addedBy      User?     @relation("CourseWaEventAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
-
-  @@unique([courseId, waEventId])
-  @@index([waEventId])
+enum WaLinkKind {
+  EVENT // registered for a Wild Apricot event
+  GROUP // a member of a Wild Apricot member group
+  LEVEL // currently holds a Wild Apricot membership level
 }
 
-/// One run of the registration sync, for the admin "last sync" panel. `detail`
-/// holds the unmatched registrations and per-link notes.
+/// Links something in Wild Apricot to an LMS course: everyone it covers is
+/// enrolled. A course may have several links — a workshop run each term is one
+/// course fed by many events, and a course can be open to both an event's
+/// registrants and a member group.
+model CourseWaLink {
+  id           String     @id @default(cuid())
+  courseId     String
+  kind         WaLinkKind @default(EVENT)
+  /// The Wild Apricot id: an event, member group or membership level id
+  /// depending on `kind`. Ids aren't unique across kinds, so always pair them.
+  waId         Int
+  waAccountId  Int? // the Wild Apricot account the id belongs to (audit trail)
+  name         String     @default("") // name as Wild Apricot last reported it
+  startsAt     DateTime? // events only
+  endsAt       DateTime? // events only
+  active       Boolean    @default(true) // untick to stop syncing, keeping enrollments
+  /// Remove access when someone is no longer covered. Events stop mirroring
+  /// removals once they're well over; groups and levels are live entitlements
+  /// and mirror them for as long as the link is active.
+  revoke       Boolean    @default(true)
+  lastSyncedAt DateTime?
+  lastCount    Int? // people seen in the last successful sync
+  lastError    String?
+  addedById    String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  addedBy     User?        @relation("CourseWaLinkAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  enrollments Enrollment[]
+
+  @@unique([courseId, kind, waId])
+  @@index([kind, waId])
+}
+
+/// One run of the sync, for the admin "last sync" panel. `detail` holds the
+/// people who couldn't be matched to an account, and per-link notes.
 model WaSyncRun {
   id            String        @id @default(cuid())
   trigger       WaSyncTrigger

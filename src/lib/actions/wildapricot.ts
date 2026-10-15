@@ -4,68 +4,87 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole, requireUser } from "@/lib/auth";
 import { requireCourseManager } from "@/lib/permissions";
+import type { WaLinkKind } from "@prisma/client";
 import { WaError, waAdminEnabled } from "@/lib/wildapricot";
-import { waGetEvent } from "@/lib/wildapricot-admin";
+import { waGetEvent, waGetMemberGroup, waGetMembershipLevel } from "@/lib/wildapricot-admin";
 import { type WaSyncResult, syncWaEnrollments, waSyncSummary } from "@/lib/wildapricot-sync";
 import type { ActionResult } from "@/lib/action-types";
 
-/** Links a Wild Apricot event to a course, and runs the sync so the result is visible at once. */
-export async function linkCourseWaEvent(courseId: string, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
+const KIND_NOUNS: Record<WaLinkKind, string> = { EVENT: "event", GROUP: "member group", LEVEL: "membership level" };
+
+/** Confirms the thing exists in Wild Apricot and returns what we store about it. */
+async function describe(kind: WaLinkKind, waId: number) {
+  if (kind === "GROUP") {
+    const g = await waGetMemberGroup(waId);
+    return g && { name: g.name, startsAt: null, endsAt: null };
+  }
+  if (kind === "LEVEL") {
+    const l = await waGetMembershipLevel(waId);
+    return l && { name: l.name, startsAt: null, endsAt: null };
+  }
+  const e = await waGetEvent(waId);
+  return e && { name: e.name, startsAt: e.startDate, endsAt: e.endDate };
+}
+
+/**
+ * Links a Wild Apricot event, member group or membership level to a course,
+ * then syncs so the effect is visible immediately.
+ */
+export async function linkCourseWaLink(
+  courseId: string,
+  kind: WaLinkKind,
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
   const user = await requireUser();
   await requireCourseManager(user, courseId);
-  if (!waAdminEnabled()) return { error: "Wild Apricot registration sync isn't configured." };
+  if (!waAdminEnabled()) return { error: "Wild Apricot sync isn't configured." };
 
-  // Accept a bare id or a pasted Wild Apricot event URL (…/event-1234567).
-  const raw = String(formData.get("waEventId") ?? "").trim();
-  const waEventId = Number(raw.match(/(\d{3,})\s*$/)?.[1] ?? raw);
-  if (!Number.isInteger(waEventId) || waEventId <= 0) {
-    return { error: "Enter the Wild Apricot event id (the number at the end of the event's web address)." };
+  // Accept a bare id or a pasted Wild Apricot URL ending in the id.
+  const raw = String(formData.get("waId") ?? "").trim();
+  const waId = Number(raw.match(/(\d{3,})\s*$/)?.[1] ?? raw);
+  if (!Number.isInteger(waId) || waId <= 0) {
+    return { error: `Enter the Wild Apricot ${KIND_NOUNS[kind]} id (the number at the end of its web address).` };
   }
 
-  let event;
+  let found;
   try {
-    event = await waGetEvent(waEventId);
+    found = await describe(kind, waId);
   } catch (e) {
     return { error: e instanceof WaError ? e.message : "Couldn't reach Wild Apricot. Please try again." };
   }
-  if (!event) return { error: `Wild Apricot has no event ${waEventId}. Check the id and try again.` };
+  if (!found) return { error: `Wild Apricot has no ${KIND_NOUNS[kind]} ${waId}. Check the id and try again.` };
 
-  const existing = await db.courseWaEvent.findUnique({ where: { courseId_waEventId: { courseId, waEventId } } });
-  if (existing) return { error: `“${event.name}” is already linked to this course.` };
+  const existing = await db.courseWaLink.findUnique({ where: { courseId_kind_waId: { courseId, kind, waId } } });
+  if (existing) return { error: `“${found.name}” is already linked to this course.` };
 
-  await db.courseWaEvent.create({
-    data: {
-      courseId,
-      waEventId,
-      name: event.name,
-      startsAt: event.startDate,
-      endsAt: event.endDate,
-      addedById: user.id,
-    },
+  await db.courseWaLink.create({
+    data: { courseId, kind, waId, name: found.name, startsAt: found.startsAt, endsAt: found.endsAt, addedById: user.id },
   });
 
   const result = await syncWaEnrollments({ trigger: "ADMIN", courseId });
   revalidateWa(courseId);
-  return { ok: `Linked “${event.name}”. ${waSyncSummary(result)}` };
+  return { ok: `Linked “${found.name}”. ${waSyncSummary(result)}` };
 }
 
-export async function unlinkCourseWaEvent(linkId: string): Promise<void> {
+export async function unlinkCourseWaLink(linkId: string): Promise<void> {
   const user = await requireUser();
-  const link = await db.courseWaEvent.findUnique({ where: { id: linkId }, select: { courseId: true } });
+  const link = await db.courseWaLink.findUnique({ where: { id: linkId }, select: { courseId: true } });
   if (!link) return;
   await requireCourseManager(user, link.courseId);
-  // Enrollments stay: taking the link away shouldn't take away access someone already has.
-  await db.courseWaEvent.delete({ where: { id: linkId } });
+  // Enrollments stay, with waLinkId set to null by the FK — taking the link away
+  // shouldn't take away access someone already has.
+  await db.courseWaLink.delete({ where: { id: linkId } });
   revalidateWa(link.courseId);
 }
 
-/** Flips one of the two per-link switches: `active` (keep syncing) or `revoke` (mirror cancellations). */
-export async function toggleCourseWaEvent(linkId: string, field: "active" | "revoke"): Promise<void> {
+/** Flips one of the two per-link switches: `active` (keep syncing) or `revoke` (mirror removals). */
+export async function toggleCourseWaLink(linkId: string, field: "active" | "revoke"): Promise<void> {
   const user = await requireUser();
-  const link = await db.courseWaEvent.findUnique({ where: { id: linkId }, select: { courseId: true, active: true, revoke: true } });
+  const link = await db.courseWaLink.findUnique({ where: { id: linkId }, select: { courseId: true, active: true, revoke: true } });
   if (!link) return;
   await requireCourseManager(user, link.courseId);
-  await db.courseWaEvent.update({
+  await db.courseWaLink.update({
     where: { id: linkId },
     // Re-enabling a link that was retired for being long over clears the explanation with it.
     data: field === "active" ? { active: !link.active, lastError: null } : { revoke: !link.revoke },

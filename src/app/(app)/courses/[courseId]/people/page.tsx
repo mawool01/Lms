@@ -16,7 +16,7 @@ export default async function PeoplePage({ params }: { params: Promise<{ courseI
     include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
     orderBy: { user: { name: "asc" } },
   });
-  const waLinked = await db.courseWaEvent.count({ where: { courseId, active: true } });
+  const waLinked = await db.courseWaLink.count({ where: { courseId, active: true } });
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -50,7 +50,7 @@ export default async function PeoplePage({ params }: { params: Promise<{ courseI
                 (source === "WILD_APRICOT" ? (
                   <ConfirmForm
                     action={removeStudent.bind(null, courseId, s.id)}
-                    confirm={`${s.name} is enrolled through a Wild Apricot registration. Removing them here is temporary — the next sync will add them back unless you unlink the event or cancel their registration in Wild Apricot. Remove anyway?`}
+                    confirm={`${s.name} is enrolled through Wild Apricot. Removing them here is temporary — the next sync will add them back unless you unlink it in course settings, or they stop being covered in Wild Apricot. Remove anyway?`}
                   >
                     <button className="btn-ghost btn-sm text-red-600" title="Remove from course">✕</button>
                   </ConfirmForm>
@@ -72,8 +72,8 @@ export default async function PeoplePage({ params }: { params: Promise<{ courseI
           </ActionForm>
           {waLinked > 0 && (
             <p className="muted mt-4 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
-              🌿 {waLinked === 1 ? "A Wild Apricot event is" : `${waLinked} Wild Apricot events are`} linked to this course, so
-              registrants are enrolled automatically. People you add here are kept separate and never removed by that sync —{" "}
+              🌿 {waLinked === 1 ? "One Wild Apricot link feeds" : `${waLinked} Wild Apricot links feed`} this course, so the people
+              they cover are enrolled automatically. People you add here are kept separate and never removed by that sync —{" "}
               <Link href={`/courses/${courseId}/settings`} className="underline">manage the links</Link>.
             </p>
           )}
