@@ -7,6 +7,7 @@ import type { BlobClientConfig } from "@/lib/blob-config";
 import { BLOCK_LABELS, type Block, type BlockType } from "@/lib/blocks";
 import { saveLesson } from "@/lib/actions/courses";
 import { BlockRenderer } from "./block-renderer";
+import { SortableList, SortableRow } from "@/components/sortable-list";
 
 function newBlock(type: BlockType): Block {
   const id = crypto.randomUUID();
@@ -111,19 +112,28 @@ export function LessonEditor({
         </div>
       ) : (
         <>
-          {blocks.map((block, i) => (
-            <div key={block.id} className="card p-4">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold">{ICONS[block.type]} {BLOCK_LABELS[block.type]}</span>
-                <div className="flex gap-1">
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => move(i, 1)} disabled={i === blocks.length - 1} aria-label="Move down">↓</button>
-                  <button type="button" className="btn-ghost btn-sm text-red-600" onClick={() => remove(block.id)} aria-label="Delete block">✕</button>
+          <SortableList
+            ids={blocks.map((b) => b.id)}
+            onReorder={(ids) => setBlocks((bs) => ids.map((id) => bs.find((b) => b.id === id)!).filter(Boolean))}
+            label="content blocks"
+            className="space-y-4"
+          >
+            {blocks.map((block, i) => (
+              <SortableRow key={block.id} id={block.id} handleClassName="mt-5">
+                <div className="card p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold">{ICONS[block.type]} {BLOCK_LABELS[block.type]}</span>
+                    <div className="flex gap-1">
+                      <button type="button" className="btn-ghost btn-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
+                      <button type="button" className="btn-ghost btn-sm" onClick={() => move(i, 1)} disabled={i === blocks.length - 1} aria-label="Move down">↓</button>
+                      <button type="button" className="btn-ghost btn-sm text-red-600" onClick={() => remove(block.id)} aria-label="Delete block">✕</button>
+                    </div>
+                  </div>
+                  <BlockFields block={block} onChange={(patch) => update(block.id, patch)} uploadsEnabled={uploadsEnabled} />
                 </div>
-              </div>
-              <BlockFields block={block} onChange={(patch) => update(block.id, patch)} uploadsEnabled={uploadsEnabled} />
-            </div>
-          ))}
+              </SortableRow>
+            ))}
+          </SortableList>
           <div className="card flex flex-wrap items-center gap-2 border-dashed p-4">
             <span className="muted mr-1 text-sm font-medium">Add block:</span>
             {(Object.keys(BLOCK_LABELS) as BlockType[]).map((t) => (

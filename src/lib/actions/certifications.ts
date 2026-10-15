@@ -10,6 +10,7 @@ import { DEFAULT_PROGRAMS } from "@/lib/certifications/defaults";
 import { appUrl, sendEmail } from "@/lib/certifications/email";
 import { expiryFor, newCertCode } from "@/lib/certifications/status";
 import { isSafeUrl } from "@/lib/blocks";
+import { orderUpdates } from "@/lib/reorder";
 import type { ActionResult } from "@/lib/action-types";
 
 const str = (v: FormDataEntryValue | null) => String(v ?? "").trim();
@@ -529,6 +530,16 @@ export async function saveCriterion(programId: string, criterionId: string | nul
   else await db.certCriterion.create({ data: { ...data, programId, position: await db.certCriterion.count({ where: { programId } }) } });
   revalidateCerts();
   return { ok: criterionId ? "Criterion saved." : "Criterion added." };
+}
+
+/** Drag-to-reorder: `ids` is the program's whole criterion list, in its new order. */
+export async function reorderCriteria(programId: string, ids: string[]) {
+  await requireRole("ADMIN");
+  const siblings = await db.certCriterion.findMany({ where: { programId }, orderBy: [{ position: "asc" }, { id: "asc" }], select: { id: true } });
+  const updates = orderUpdates(siblings, ids);
+  if (!updates?.length) return;
+  await db.$transaction(updates.map((u) => db.certCriterion.update({ where: { id: u.id }, data: { position: u.position } })));
+  revalidateCerts();
 }
 
 export async function moveCriterion(criterionId: string, direction: -1 | 1) {

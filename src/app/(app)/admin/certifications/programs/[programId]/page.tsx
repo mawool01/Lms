@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { moveCriterion, saveCriterion, saveLevel, saveProgram } from "@/lib/actions/certifications";
+import { moveCriterion, reorderCriteria, saveCriterion, saveLevel, saveProgram } from "@/lib/actions/certifications";
 import { CriterionForm, LevelForm, ProgramForm } from "@/components/cert/program-forms";
 import { Card, Pill } from "@/components/ui";
+import { SortableList, SortableRow } from "@/components/sortable-list";
 
 export default async function ProgramEditorPage({ params }: { params: Promise<{ programId: string }> }) {
   const { programId } = await params;
@@ -44,9 +45,15 @@ export default async function ProgramEditorPage({ params }: { params: Promise<{ 
 
       <Card title={`Criteria / standards (${program.criteria.length})`}>
         <p className="muted mb-3 text-sm">Applicants answer each active criterion with a narrative (and evidence if required). Reviewers rate each one as does not meet / meets / exceeds.</p>
-        <div className="space-y-3">
+        <SortableList
+          ids={program.criteria.map((c) => c.id)}
+          onReorder={reorderCriteria.bind(null, program.id)}
+          label="criteria"
+          className="space-y-3"
+        >
           {program.criteria.map((c, i) => (
-            <details key={c.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+            <SortableRow key={c.id} id={c.id} handleClassName="mt-3">
+            <details className="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
               <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2">
                 <span className="flex-1 font-medium">{i + 1}. {c.section && <span className="muted">{c.section} · </span>}{c.title}</span>
                 {c.level && <Pill>{c.level.name} only</Pill>}
@@ -57,10 +64,11 @@ export default async function ProgramEditorPage({ params }: { params: Promise<{ 
               </summary>
               <div className="mt-3"><CriterionForm action={saveCriterion.bind(null, program.id, c.id)} levels={program.levels} values={c} /></div>
             </details>
+            </SortableRow>
           ))}
-          <div className="rounded-xl border border-dashed border-slate-300 p-3 dark:border-slate-700">
-            <CriterionForm action={saveCriterion.bind(null, program.id, null)} levels={program.levels} />
-          </div>
+        </SortableList>
+        <div className="mt-3 rounded-xl border border-dashed border-slate-300 p-3 dark:border-slate-700">
+          <CriterionForm action={saveCriterion.bind(null, program.id, null)} levels={program.levels} />
         </div>
       </Card>
     </div>

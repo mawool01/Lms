@@ -8,6 +8,7 @@ import { ITEM_TYPES, ITEM_TYPE_ORDER, VISIBILITY_LABELS, itemDates } from "@/lib
 import {
   deletePortfolioItem,
   movePortfolioItem,
+  reorderPortfolioItems,
   requestVerification,
   savePortfolioSettings,
   savePortfolioItem,
@@ -16,6 +17,7 @@ import {
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { PortfolioItemForm } from "@/components/portfolio/item-form";
 import { CopyLink } from "@/components/portfolio/copy-link";
+import { SortableList, SortableRow } from "@/components/sortable-list";
 import { Card, PageHeader, Pill } from "@/components/ui";
 
 export const metadata = { title: "My portfolio" };
@@ -62,10 +64,15 @@ export default async function MyPortfolioPage() {
             return (
               <Card key={type} title={`${meta.icon} ${meta.label}`}>
                 {list.length > 0 && (
-                  <ul className="mb-4 space-y-2">
+                  <SortableList
+                    ids={list.map((i) => i.id)}
+                    onReorder={reorderPortfolioItems.bind(null, type)}
+                    label={meta.label.toLowerCase()}
+                    className="mb-4 space-y-2"
+                  >
                     {list.map((item, idx) => (
-                      <li key={item.id} className={`rounded-xl border border-slate-200 dark:border-slate-800 ${item.visible ? "" : "opacity-60"}`}>
-                        <details>
+                      <SortableRow key={item.id} id={item.id}>
+                        <details className={`rounded-xl border border-slate-200 dark:border-slate-800 ${item.visible ? "" : "opacity-60"}`}>
                           <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 p-3">
                             <div className="min-w-0 flex-1">
                               <p className="font-medium">{item.title}</p>
@@ -89,9 +96,9 @@ export default async function MyPortfolioPage() {
                             </div>
                           </div>
                         </details>
-                      </li>
+                      </SortableRow>
                     ))}
-                  </ul>
+                  </SortableList>
                 )}
                 <details className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700" open={list.length === 0 && (type === "POSITION" || type === "PRESENTATION")}>
                   <summary className="cursor-pointer list-none p-3 text-sm font-medium text-brand-700 dark:text-brand-300">+ Add {meta.singular.toLowerCase()}</summary>

@@ -8,6 +8,7 @@ import { isSafeUrl } from "@/lib/blocks";
 import { appUrl, sendEmail } from "@/lib/certifications/email";
 import { ITEM_TYPES } from "@/lib/portfolio-meta";
 import { slugProblem } from "@/lib/portfolio";
+import { orderUpdates } from "@/lib/reorder";
 import type { ActionResult } from "@/lib/action-types";
 
 const str = (v: FormDataEntryValue | null) => String(v ?? "").trim();
@@ -134,6 +135,22 @@ export async function togglePortfolioItem(itemId: string) {
   const { user, item } = await ownItem(itemId);
   await db.portfolioItem.update({ where: { id: itemId }, data: { visible: !item.visible } });
   revalidatePortfolio(user.portfolioSlug);
+}
+
+/** Drag-to-reorder: `ids` is the whole list for one type, in its new order. */
+export async function reorderPortfolioItems(type: PortfolioItemType, ids: string[]) {
+  const user = await requireUser();
+  if (!(type in ITEM_TYPES)) return;
+  const siblings = await db.portfolioItem.findMany({
+    where: { userId: user.id, type },
+    orderBy: [{ position: "asc" }, { startDate: "desc" }],
+    select: { id: true },
+  });
+  const updates = orderUpdates(siblings, ids);
+  if (!updates?.length) return;
+  await db.$transaction(updates.map((u) => db.portfolioItem.update({ where: { id: u.id }, data: { position: u.position } })));
+  revalidatePortfolio(user.portfolioSlug);
+  revalidatePath("/portfolio");
 }
 
 export async function movePortfolioItem(itemId: string, direction: -1 | 1) {

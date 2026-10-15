@@ -11,6 +11,8 @@ import {
   moveModule,
   postAnnouncement,
   renameModule,
+  reorderLessons,
+  reorderModules,
   unenroll,
 } from "@/lib/actions/courses";
 import { ActionForm, LocalTime, SubmitButton } from "@/components/forms";
@@ -20,6 +22,7 @@ import { timeAgo } from "@/lib/utils";
 import { isComplete, statusLabel } from "@/lib/scorm/status";
 import { blobClientConfig } from "@/lib/blob";
 import { ScormUpload } from "@/components/scorm/scorm-upload";
+import { SortableList, SortableRow, StaticRow } from "@/components/sortable-list";
 
 export default async function CourseOverview({ params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = await params;
@@ -61,15 +64,17 @@ export default async function CourseOverview({ params }: { params: Promise<{ cou
     const finished = attempt ? isComplete(attempt) : false;
     const href = isMember ? `/courses/${courseId}/scorm/${p.id}` : undefined;
     return (
-      <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">
-        <span className={finished ? "text-emerald-500" : "text-slate-300 dark:text-slate-600"}>{finished ? "✔" : "○"}</span>
-        <span title="SCORM package">📦</span>
-        {href ? <Link href={href} className="flex-1 text-sm hover:underline">{p.title}</Link> : <span className="flex-1 text-sm">{p.title}</span>}
-        {!p.published && <Pill tone="yellow">Draft</Pill>}
-        {isEnrolled && attempt && !finished && <Pill tone="brand">{statusLabel(attempt).label}</Pill>}
-        <span className="muted hidden text-xs sm:inline">{p.points} pts</span>
-        {canManage && <Link href={`/courses/${courseId}/scorm/${p.id}`} className="btn-ghost btn-sm">Results</Link>}
-      </li>
+      <StaticRow key={p.id} className="px-4 py-2.5">
+        <div className="flex items-center gap-3">
+          <span className={finished ? "text-emerald-500" : "text-slate-300 dark:text-slate-600"}>{finished ? "✔" : "○"}</span>
+          <span title="SCORM package">📦</span>
+          {href ? <Link href={href} className="flex-1 text-sm hover:underline">{p.title}</Link> : <span className="flex-1 text-sm">{p.title}</span>}
+          {!p.published && <Pill tone="yellow">Draft</Pill>}
+          {isEnrolled && attempt && !finished && <Pill tone="brand">{statusLabel(attempt).label}</Pill>}
+          <span className="muted hidden text-xs sm:inline">{p.points} pts</span>
+          {canManage && <Link href={`/courses/${courseId}/scorm/${p.id}`} className="btn-ghost btn-sm">Results</Link>}
+        </div>
+      </StaticRow>
     );
   };
   const nextLesson = allLessons.find((l) => !done.has(l.id));
@@ -93,8 +98,16 @@ export default async function CourseOverview({ params }: { params: Promise<{ cou
         >
           {modules.length === 0 && <EmptyState icon="🧱" title="No modules yet" />}
           <div className="space-y-4">
+            <SortableList
+              ids={modules.map((m) => m.id)}
+              onReorder={reorderModules.bind(null, courseId)}
+              disabled={!canManage}
+              label="modules"
+              className="space-y-4"
+            >
             {modules.map((mod, mi) => (
-              <div key={mod.id} className="rounded-xl border border-slate-200 dark:border-slate-800">
+              <SortableRow key={mod.id} id={mod.id} handleClassName="mt-3">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-800/40">
                   <h3 className="font-semibold">
                     <span className="muted mr-2 text-sm">Module {mi + 1}</span>
@@ -119,11 +132,18 @@ export default async function CourseOverview({ params }: { params: Promise<{ cou
                     </div>
                   )}
                 </div>
-                <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                <SortableList
+                  ids={mod.lessons.map((l) => l.id)}
+                  onReorder={reorderLessons.bind(null, mod.id)}
+                  disabled={!canManage}
+                  label="lessons"
+                  className="divide-y divide-slate-100 dark:divide-slate-800"
+                >
                   {mod.lessons.map((lesson, li) => {
                     const href = isMember ? `/courses/${courseId}/lessons/${lesson.id}` : undefined;
                     return (
-                      <li key={lesson.id} className="flex items-center gap-3 px-4 py-2.5">
+                      <SortableRow key={lesson.id} id={lesson.id} className="px-4 py-2.5" handleClassName="mt-0">
+                      <div className="flex items-center gap-3">
                         <span className={done.has(lesson.id) ? "text-emerald-500" : "text-slate-300 dark:text-slate-600"}>
                           {done.has(lesson.id) ? "✔" : "○"}
                         </span>
@@ -140,12 +160,13 @@ export default async function CourseOverview({ params }: { params: Promise<{ cou
                             <Link href={`/courses/${courseId}/lessons/${lesson.id}/edit`} className="btn-ghost btn-sm">Edit</Link>
                           </span>
                         )}
-                      </li>
+                      </div>
+                      </SortableRow>
                     );
                   })}
                   {mod.scormPackages.map(scormRow)}
                   {mod.lessons.length === 0 && mod.scormPackages.length === 0 && <li className="muted px-4 py-3 text-sm">No content in this module yet.</li>}
-                </ul>
+                </SortableList>
                 {canManage && (
                   <div className="flex flex-wrap gap-2 border-t border-slate-100 p-3 dark:border-slate-800">
                     <ActionForm action={createLesson.bind(null, mod.id)} className="flex min-w-0 flex-1 gap-2">
@@ -156,7 +177,9 @@ export default async function CourseOverview({ params }: { params: Promise<{ cou
                   </div>
                 )}
               </div>
+              </SortableRow>
             ))}
+            </SortableList>
           </div>
           {looseScorm.length > 0 && (
             <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800">

@@ -9,6 +9,7 @@ import { requireRole, requireUser } from "@/lib/auth";
 import { getCourseAccess, requireCourseManager, requireCourseMember } from "@/lib/permissions";
 import { blocksSchema, isSafeUrl, parseBlocks } from "@/lib/blocks";
 import { onLessonCompleted } from "@/lib/gamification";
+import { orderUpdates } from "@/lib/reorder";
 import type { ActionResult } from "@/lib/action-types";
 
 const optionalUrl = z
@@ -165,6 +166,17 @@ export async function moveModule(moduleId: string, direction: -1 | 1) {
   revalidatePath(`/courses/${mod.courseId}`);
 }
 
+/** Drag-to-reorder: `ids` is the course's whole module list, in its new order. */
+export async function reorderModules(courseId: string, ids: string[]) {
+  const user = await requireUser();
+  await requireCourseManager(user, courseId);
+  const siblings = await db.module.findMany({ where: { courseId }, orderBy: [{ position: "asc" }, { id: "asc" }], select: { id: true } });
+  const updates = orderUpdates(siblings, ids);
+  if (!updates?.length) return;
+  await db.$transaction(updates.map((u) => db.module.update({ where: { id: u.id }, data: { position: u.position } })));
+  revalidatePath(`/courses/${courseId}`);
+}
+
 export async function createLesson(moduleId: string, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const user = await requireUser();
   const mod = await db.module.findUniqueOrThrow({ where: { id: moduleId } });
@@ -216,6 +228,18 @@ export async function moveLesson(lessonId: string, direction: -1 | 1) {
   const siblings = await db.lesson.findMany({ where: { moduleId: lesson.moduleId }, orderBy: [{ position: "asc" }, { id: "asc" }] });
   await reorder(siblings, lessonId, direction, (id, position) => db.lesson.update({ where: { id }, data: { position } }));
   revalidatePath(`/courses/${lesson.module.courseId}`);
+}
+
+/** Drag-to-reorder: `ids` is the module's whole lesson list, in its new order. */
+export async function reorderLessons(moduleId: string, ids: string[]) {
+  const user = await requireUser();
+  const mod = await db.module.findUniqueOrThrow({ where: { id: moduleId } });
+  await requireCourseManager(user, mod.courseId);
+  const siblings = await db.lesson.findMany({ where: { moduleId }, orderBy: [{ position: "asc" }, { id: "asc" }], select: { id: true } });
+  const updates = orderUpdates(siblings, ids);
+  if (!updates?.length) return;
+  await db.$transaction(updates.map((u) => db.lesson.update({ where: { id: u.id }, data: { position: u.position } })));
+  revalidatePath(`/courses/${mod.courseId}`);
 }
 
 async function reorder<T extends { id: string }>(items: T[], id: string, direction: -1 | 1, save: (id: string, position: number) => Promise<unknown>) {
