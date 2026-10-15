@@ -8,6 +8,7 @@ import { changePassword, updatePreferences, updateProfile } from "@/lib/actions/
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { waEnabled } from "@/lib/wildapricot";
 import { formatDate } from "@/lib/utils";
+import { AppearanceSelect } from "@/components/appearance-select";
 import { BadgeGrid } from "@/components/badge-grid";
 import { Avatar, Card, PageHeader, ProgressBar, RolePill } from "@/components/ui";
 
@@ -69,11 +70,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
             <ActionForm action={updatePreferences} className="space-y-4">
               <div className="field sm:max-w-xs">
                 <label htmlFor="theme">Appearance</label>
-                <select id="theme" name="theme" defaultValue={user.theme}>
-                  <option value="SYSTEM">Match my device</option>
-                  <option value="LIGHT">Light</option>
-                  <option value="DARK">Dark</option>
-                </select>
+                <AppearanceSelect defaultValue={user.theme} />
               </div>
               <label className="flex items-center gap-2 font-normal">
                 <input type="checkbox" name="showOnLeaderboard" defaultChecked={user.showOnLeaderboard} /> Show me on leaderboards

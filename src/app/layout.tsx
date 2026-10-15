@@ -30,19 +30,15 @@ export function generateViewport(): Viewport {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [user, branding] = await Promise.all([getCurrentUser(), getBranding()]);
-  const theme = user?.theme ?? "SYSTEM";
+  // data-theme carries all three choices ("system" | "light" | "dark") and
+  // globals.css resolves them, so "Light" renders differently from "Match my
+  // device" rather than identically to it.
+  const theme = (user?.theme ?? "SYSTEM").toLowerCase();
   return (
-    <html lang="en" className={`${inter.variable} ${theme === "DARK" ? "dark" : ""}`} suppressHydrationWarning>
+    <html lang="en" data-theme={theme} className={inter.variable} suppressHydrationWarning>
       <head>
         {/* Admin-chosen brand colors (Admin → Branding) override the default palette. */}
         <style id="brand-colors" dangerouslySetInnerHTML={{ __html: brandingCss(branding) }} />
-        {theme === "SYSTEM" && (
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `if(window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.classList.add('dark')`,
-            }}
-          />
-        )}
       </head>
       <body className="min-h-dvh font-sans">{children}</body>
     </html>
