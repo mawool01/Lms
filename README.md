@@ -37,7 +37,9 @@ A full-featured LMS for ICLCA built with **Next.js 15 (App Router)**, **PostgreS
 5. **Wild Apricot sign-on** (optional): in Wild Apricot go to *Settings → Integration → Authorized applications → Authorize application → Server application*, give it a name, tick **Wild Apricot login**, and add your LMS domain (e.g. `learn.iclca.org` and/or `your-project.vercel.app`) under **Trusted redirect domains**. Then set in Vercel:
    - `WILDAPRICOT_URL` — your Wild Apricot site address, e.g. `https://iclca.wildapricot.org` (or your custom domain)
    - `WILDAPRICOT_CLIENT_ID` and `WILDAPRICOT_CLIENT_SECRET` — from the authorized application
-6. **Wild Apricot event registrations → course enrollments** (optional): in Wild Apricot go to *Settings → Integration → API keys → Authorize application → Server application*, name it (e.g. "ICLCA LMS sync") and give it access to events and contacts. Then set `WILDAPRICOT_API_KEY` in Vercel (and `CRON_SECRET`, which enables the nightly job in `vercel.json`). Link events to courses from **Admin → Wild Apricot** or a course's **Settings** tab.
+6. **Wild Apricot event registrations → course enrollments** (optional): in the Wild Apricot admin view go to *Apps → Authorized applications* (older accounts: *Settings → Integration → Authorized applications*) and either open the application you made in step 5 or authorize a new **Server application** for the sync. **The API key is shown under the Application name field**, above the Client ID and Client Secret — a server application issues all three. Make sure that application has access to **events and contacts** (an app restricted to "Wild Apricot login" can't read registrations). A separate application for the sync is tidier, since then rotating its key can't stop people signing in.
+
+   Then set `WILDAPRICOT_API_KEY` in Vercel (and `CRON_SECRET`, which enables the nightly job in `vercel.json`). Link events to courses from **Admin → Wild Apricot** or a course's **Settings** tab.
 
    How it behaves, so there are no surprises:
    - Any registration grants access, paid or unpaid.

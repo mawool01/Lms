@@ -58,9 +58,14 @@ export default async function AdminWildApricotPage({ searchParams }: { searchPar
         <Card className="mb-6">
           <p className="font-medium">Registration sync isn&apos;t set up yet.</p>
           <p className="muted mt-2 text-sm">
-            In Wild Apricot go to <strong>Settings → Integration → API keys</strong>, authorize a{" "}
-            <strong>server application</strong> with access to events and contacts, then set{" "}
-            <code>WILDAPRICOT_API_KEY</code> in this project&apos;s environment variables and redeploy.
+            In the Wild Apricot admin view go to <strong>Apps → Authorized applications</strong> and open your{" "}
+            <strong>server application</strong> (or authorize a new one). The <strong>API key is shown under the
+            Application name field</strong>, above the client id and secret — it&apos;s the same screen you got those
+            from. Set it as <code>WILDAPRICOT_API_KEY</code> here and redeploy.
+          </p>
+          <p className="muted mt-2 text-sm">
+            That application needs access to <strong>events and contacts</strong>; one restricted to &ldquo;Wild Apricot
+            login&rdquo; can sign people in but can&apos;t read registrations.
             {!waEnabled() && " Sign-on isn't configured either (WILDAPRICOT_URL / CLIENT_ID / CLIENT_SECRET)."}
           </p>
         </Card>

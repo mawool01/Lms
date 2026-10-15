@@ -9,7 +9,10 @@ import { WaApiError, WaError, waAdminEnabled, waConfig } from "./wildapricot";
  * authenticates with an API key rather than as a person, so it works from the
  * nightly cron with no one signed in.
  *
- *   WILDAPRICOT_API_KEY     Settings → Integration → API keys (server application)
+ *   WILDAPRICOT_API_KEY     Apps → Authorized applications → your server application;
+ *                           the API key sits under the Application name field, above
+ *                           the client id/secret the sign-on flow uses. The application
+ *                           needs events and contacts access, not just "Wild Apricot login".
  *   WILDAPRICOT_ACCOUNT_ID  optional; only if the key covers several accounts
  *
  * Wild Apricot made pagination mandatory on 1 November 2025, so every list call
