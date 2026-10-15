@@ -61,7 +61,23 @@ export function PortfolioItemForm({
   };
 
   return (
-    <ActionForm action={action} resetOnSuccess={!values} className="space-y-3">
+    <ActionForm
+      action={action}
+      resetOnSuccess={!values}
+      // On the blank "add" form, form.reset() can't clear these — without this
+      // the files and the "currently hold this role" tick carried over and were
+      // attached to the next entry too. The edit form keeps what was just saved.
+      onSuccess={
+        values
+          ? undefined
+          : () => {
+              setFiles([]);
+              setCurrent(false);
+              setError("");
+            }
+      }
+      className="space-y-3"
+    >
       <input type="hidden" name="type" value={type} />
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="field sm:col-span-2">
@@ -140,7 +156,10 @@ export function PortfolioItemForm({
         )}
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>
-      <SubmitButton className="btn-primary btn-sm">{values ? "Save" : `Add ${meta.singular.toLowerCase()}`}</SubmitButton>
+      {/* "Save …", not "Add …": the disclosure that opens a blank form already
+          says "+ Add position", so repeating it on the submit button made it
+          unclear which one actually added anything. */}
+      <SubmitButton className="btn-primary btn-sm">Save {meta.singular.toLowerCase()}</SubmitButton>
     </ActionForm>
   );
 }

@@ -20,7 +20,22 @@ export function QuestionForm({
   const [type, setType] = useState<QType>(initial?.type ?? "MULTIPLE_CHOICE");
   const [options, setOptions] = useState<string[]>(initial?.type === "MULTIPLE_CHOICE" ? initial.options : ["", "", "", ""]);
   return (
-    <ActionForm action={action} resetOnSuccess={!initial} className="space-y-3">
+    <ActionForm
+      action={action}
+      resetOnSuccess={!initial}
+      // The type and the choice text live in React state, which form.reset()
+      // leaves alone — so without this the previous question's choices stayed
+      // in the box when adding the next one.
+      onSuccess={
+        initial
+          ? undefined
+          : () => {
+              setType("MULTIPLE_CHOICE");
+              setOptions(["", "", "", ""]);
+            }
+      }
+      className="space-y-3"
+    >
       <div className="flex flex-col gap-2 sm:flex-row">
         <select name="type" value={type} onChange={(e) => setType(e.target.value as QType)} className="sm:w-52" aria-label="Question type">
           <option value="MULTIPLE_CHOICE">Multiple choice</option>

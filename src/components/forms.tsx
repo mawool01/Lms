@@ -18,25 +18,41 @@ export function SubmitButton({ children, className = "btn-primary", pendingText 
   );
 }
 
-/** A form bound to a server action returning {error?, ok?}; shows the message inline. */
+/**
+ * A form bound to a server action returning {error?, ok?}; shows the message inline.
+ *
+ * `resetOnSuccess` is a native form.reset(), so it only clears native inputs —
+ * anything a form keeps in React state (uploaded files, a list of choices, a
+ * controlled checkbox) survives it and would be submitted again with the next
+ * entry. Forms holding such state must clear it in `onSuccess`.
+ */
 export function ActionForm({
   action,
   children,
   className,
   resetOnSuccess = false,
   confirm,
+  onSuccess,
 }: {
   action: FormAction;
   children: ReactNode;
   className?: string;
   resetOnSuccess?: boolean;
   confirm?: string;
+  onSuccess?: () => void;
 }) {
   const [state, formAction] = useActionState(action, undefined);
   const ref = useRef<HTMLFormElement>(null);
+  // Each submission yields a new state object, so this fires exactly once per
+  // result — even if `onSuccess` is an inline function with a fresh identity.
+  const handled = useRef<ActionResult>(undefined);
   useEffect(() => {
-    if (resetOnSuccess && state?.ok !== undefined && !state.error) ref.current?.reset();
-  }, [state, resetOnSuccess]);
+    if (!state || state === handled.current) return;
+    handled.current = state;
+    if (state.ok === undefined || state.error) return;
+    if (resetOnSuccess) ref.current?.reset();
+    onSuccess?.();
+  }, [state, resetOnSuccess, onSuccess]);
   return (
     <form
       ref={ref}
