@@ -8,25 +8,35 @@ import "server-only";
  *   WILDAPRICOT_CLIENT_ID      from Settings → Integration → Authorized applications
  *   WILDAPRICOT_CLIENT_SECRET  from the same page
  * Optional overrides (only needed for testing): WILDAPRICOT_OAUTH_URL, WILDAPRICOT_API_URL.
+ *
+ * Reading event registrations (see wildapricot-admin.ts) is a separate, server-to-server
+ * integration that needs only WILDAPRICOT_API_KEY — the two halves are independent.
  */
-const config = () => ({
+export const waConfig = () => ({
   siteUrl: (process.env.WILDAPRICOT_URL ?? "").replace(/\/$/, ""),
   clientId: process.env.WILDAPRICOT_CLIENT_ID ?? "",
   clientSecret: process.env.WILDAPRICOT_CLIENT_SECRET ?? "",
   oauthUrl: (process.env.WILDAPRICOT_OAUTH_URL ?? "https://oauth.wildapricot.org").replace(/\/$/, ""),
   apiUrl: (process.env.WILDAPRICOT_API_URL ?? "https://api.wildapricot.org").replace(/\/$/, ""),
+  apiKey: process.env.WILDAPRICOT_API_KEY ?? "",
+  // Only needed when one API key has permissions on more than one Wild Apricot account.
+  accountId: Number(process.env.WILDAPRICOT_ACCOUNT_ID) || 0,
 });
 
+/** True when "Sign in with Wild Apricot" is configured. */
 export const waEnabled = () => {
-  const c = config();
+  const c = waConfig();
   return !!(c.siteUrl && c.clientId && c.clientSecret);
 };
+
+/** True when the server-to-server API key is configured (event registration sync). */
+export const waAdminEnabled = () => !!waConfig().apiKey;
 
 export const WA_SCOPE = "contacts_me";
 
 /** Where to send the browser to log in on the Wild Apricot site. */
 export function waAuthorizeUrl(redirectUri: string, state: string) {
-  const c = config();
+  const c = waConfig();
   const params = new URLSearchParams({ client_id: c.clientId, redirect_uri: redirectUri, scope: WA_SCOPE, state });
   return `${c.siteUrl}/sys/login/OAuthLogin?${params}`;
 }
@@ -47,9 +57,23 @@ export type WaContact = {
 
 export class WaError extends Error {}
 
+/**
+ * A WaError that also carries the HTTP status, so callers can tell "429, back off"
+ * from "404, that event no longer exists". The message stays user-safe.
+ */
+export class WaApiError extends WaError {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly endpoint: string,
+  ) {
+    super(message);
+  }
+}
+
 /** Exchanges the authorization code for a token and loads the signed-in contact. */
 export async function waFetchContact(code: string, redirectUri: string): Promise<WaContact> {
-  const c = config();
+  const c = waConfig();
   const tokenRes = await fetch(`${c.oauthUrl}/auth/token`, {
     method: "POST",
     headers: {
