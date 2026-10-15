@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
-import { waAuthorizeUrl, waEnabled } from "@/lib/wildapricot";
+import { waAuthorizeUrl, waEnabled, waRedirectUri } from "@/lib/wildapricot";
 
 /**
  * Starts "Sign in with Wild Apricot": remembers a random state and sends the browser to Wild Apricot.
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const nextParam = params.get("next") ?? "";
   const next = link ? "/profile" : nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/dashboard";
   const state = crypto.randomUUID();
-  const res = NextResponse.redirect(waAuthorizeUrl(`${req.nextUrl.origin}/auth/wildapricot/callback`, state));
+  const res = NextResponse.redirect(waAuthorizeUrl(waRedirectUri(req.nextUrl.origin), state));
   res.cookies.set("wa_oauth", JSON.stringify({ state, next, link }), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

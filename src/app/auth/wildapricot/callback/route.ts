@@ -1,7 +1,7 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { SESSION_COOKIE, SESSION_MAX_AGE, signSession, verifySession } from "@/lib/session";
-import { WaError, waDisplayName, waEnabled, waFetchContact } from "@/lib/wildapricot";
+import { WaError, waDisplayName, waEnabled, waFetchContact, waRedirectUri } from "@/lib/wildapricot";
 import { syncWaEnrollments } from "@/lib/wildapricot-sync";
 
 const STATE_COOKIE = "wa_oauth";
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   let contact;
   try {
-    contact = await waFetchContact(code, `${req.nextUrl.origin}/auth/wildapricot/callback`);
+    contact = await waFetchContact(code, waRedirectUri(req.nextUrl.origin));
   } catch (e) {
     return fail(req, e instanceof WaError ? e.message : "Wild Apricot sign-in failed. Please try again.", !!saved.link);
   }

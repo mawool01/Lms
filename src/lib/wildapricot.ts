@@ -1,12 +1,14 @@
 import "server-only";
+import { appUrl } from "@/lib/certifications/email";
 
 /**
  * Wild Apricot single sign-on (OAuth 2 "authorized application" with Wild Apricot login).
  *
  * Settings (Vercel environment variables):
- *   WILDAPRICOT_URL            your Wild Apricot site, e.g. https://iclca.wildapricot.org or https://www.iclca.org
+ *   WILDAPRICOT_URL            your Wild Apricot site, e.g. https://iclca.world or https://iclca.wildapricot.org
  *   WILDAPRICOT_CLIENT_ID      from Settings → Integration → Authorized applications
  *   WILDAPRICOT_CLIENT_SECRET  from the same page
+ *   APP_URL                    this app's own public address — see waRedirectUri()
  * Optional overrides (only needed for testing): WILDAPRICOT_OAUTH_URL, WILDAPRICOT_API_URL.
  *
  * Reading event registrations (see wildapricot-admin.ts) is a separate, server-to-server
@@ -33,6 +35,24 @@ export const waEnabled = () => {
 export const waAdminEnabled = () => !!waConfig().apiKey;
 
 export const WA_SCOPE = "contacts_me";
+
+/**
+ * Where Wild Apricot sends the browser back to. Both halves of the flow must
+ * pass the *same* string — OAuth compares them — and the domain has to appear in
+ * the application's "Trusted redirect domains" list in Wild Apricot.
+ *
+ * Hence APP_URL rather than the origin of whichever request we happen to be
+ * serving: reach the app on a second hostname (the apex instead of www, a
+ * vercel.app address, an old bookmark) and the authorize request and the token
+ * exchange can disagree, or the domain is one Wild Apricot has never been told
+ * to trust. Falls back to the request's own origin so local development works
+ * with no configuration.
+ */
+export function waRedirectUri(requestOrigin: string) {
+  const configured = !!(process.env.APP_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL);
+  const base = configured ? appUrl() : requestOrigin;
+  return `${base.replace(/\/$/, "")}/auth/wildapricot/callback`;
+}
 
 /** Where to send the browser to log in on the Wild Apricot site. */
 export function waAuthorizeUrl(redirectUri: string, state: string) {
