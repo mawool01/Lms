@@ -8,7 +8,7 @@ import { isSafeUrl } from "@/lib/blocks";
 import { appUrl, sendEmail } from "@/lib/certifications/email";
 import { ITEM_TYPES } from "@/lib/portfolio-meta";
 import { slugProblem } from "@/lib/portfolio";
-import { orderUpdates } from "@/lib/reorder";
+import { nextPosition, orderUpdates } from "@/lib/reorder";
 import type { ActionResult } from "@/lib/action-types";
 
 const str = (v: FormDataEntryValue | null) => String(v ?? "").trim();
@@ -111,7 +111,7 @@ export async function savePortfolioItem(itemId: string | null, _prev: ActionResu
       data: { ...data, ...(changed && existing.verification !== "NONE" ? { verification: "NONE", verifiedAt: null, verifiedById: null, verificationNote: null } : {}) },
     });
   } else {
-    const position = await db.portfolioItem.count({ where: { userId: user.id, type } });
+    const position = await nextPosition(db.portfolioItem, { userId: user.id, type });
     await db.portfolioItem.create({ data: { ...data, userId: user.id, position } });
   }
   revalidatePortfolio(user.portfolioSlug);
@@ -144,7 +144,7 @@ export async function reorderPortfolioItems(type: PortfolioItemType, ids: string
   const siblings = await db.portfolioItem.findMany({
     where: { userId: user.id, type },
     orderBy: [{ position: "asc" }, { startDate: "desc" }],
-    select: { id: true },
+    select: { id: true, position: true },
   });
   const updates = orderUpdates(siblings, ids);
   if (!updates?.length) return;

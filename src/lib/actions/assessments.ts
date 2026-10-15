@@ -12,6 +12,7 @@ import { isSafeUrl } from "@/lib/blocks";
 import { parseDateInput } from "@/lib/utils";
 import { loadRubric, readRubricChoice } from "@/lib/rubric-access";
 import { readRubricScores, type RubricScores } from "@/lib/rubrics";
+import { nextPosition } from "@/lib/reorder";
 import type { ActionResult } from "@/lib/action-types";
 
 // ─── Quizzes ─────────────────────────────────────────────────────────────────
@@ -113,7 +114,7 @@ export async function addQuestion(quizId: string, _prev: ActionResult, formData:
   if ("error" in q) return { error: q.error };
   const rubricId = await questionRubric(q.data.type, formData);
   if (rubricId === undefined) return { error: "You can't use that rubric." };
-  const position = await db.question.count({ where: { quizId } });
+  const position = await nextPosition(db.question, { quizId });
   await db.question.create({ data: { ...q.data, rubricId, quizId, position } });
   revalidatePath(`/courses/${quiz.courseId}/quizzes/${quizId}/edit`);
   return { ok: "Question added." };

@@ -9,7 +9,7 @@ import { requireRole, requireUser } from "@/lib/auth";
 import { getCourseAccess, requireCourseManager, requireCourseMember } from "@/lib/permissions";
 import { blocksSchema, isSafeUrl, parseBlocks } from "@/lib/blocks";
 import { onLessonCompleted } from "@/lib/gamification";
-import { orderUpdates } from "@/lib/reorder";
+import { nextPosition, orderUpdates } from "@/lib/reorder";
 import type { ActionResult } from "@/lib/action-types";
 
 const optionalUrl = z
@@ -134,8 +134,8 @@ export async function createModule(courseId: string, _prev: ActionResult, formDa
   await requireCourseManager(user, courseId);
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { error: "Module title is required." };
-  const count = await db.module.count({ where: { courseId } });
-  await db.module.create({ data: { courseId, title, position: count } });
+  const position = await nextPosition(db.module, { courseId });
+  await db.module.create({ data: { courseId, title, position } });
   revalidatePath(`/courses/${courseId}`);
   return { ok: "Module added." };
 }
@@ -170,7 +170,7 @@ export async function moveModule(moduleId: string, direction: -1 | 1) {
 export async function reorderModules(courseId: string, ids: string[]) {
   const user = await requireUser();
   await requireCourseManager(user, courseId);
-  const siblings = await db.module.findMany({ where: { courseId }, orderBy: [{ position: "asc" }, { id: "asc" }], select: { id: true } });
+  const siblings = await db.module.findMany({ where: { courseId }, orderBy: [{ position: "asc" }, { id: "asc" }], select: { id: true, position: true } });
   const updates = orderUpdates(siblings, ids);
   if (!updates?.length) return;
   await db.$transaction(updates.map((u) => db.module.update({ where: { id: u.id }, data: { position: u.position } })));
@@ -183,7 +183,7 @@ export async function createLesson(moduleId: string, _prev: ActionResult, formDa
   await requireCourseManager(user, mod.courseId);
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { error: "Lesson title is required." };
-  const count = await db.lesson.count({ where: { moduleId } });
+  const count = await nextPosition(db.lesson, { moduleId });
   const lesson = await db.lesson.create({
     data: { moduleId, title, position: count, blocks: [{ id: crypto.randomUUID(), type: "text", markdown: "" }] },
   });
@@ -235,7 +235,7 @@ export async function reorderLessons(moduleId: string, ids: string[]) {
   const user = await requireUser();
   const mod = await db.module.findUniqueOrThrow({ where: { id: moduleId } });
   await requireCourseManager(user, mod.courseId);
-  const siblings = await db.lesson.findMany({ where: { moduleId }, orderBy: [{ position: "asc" }, { id: "asc" }], select: { id: true } });
+  const siblings = await db.lesson.findMany({ where: { moduleId }, orderBy: [{ position: "asc" }, { id: "asc" }], select: { id: true, position: true } });
   const updates = orderUpdates(siblings, ids);
   if (!updates?.length) return;
   await db.$transaction(updates.map((u) => db.lesson.update({ where: { id: u.id }, data: { position: u.position } })));
