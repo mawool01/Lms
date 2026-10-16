@@ -679,6 +679,9 @@ enum PortfolioItemType {
   SERVICE
   AWARD
   PROFESSIONAL_DEVELOPMENT
+  /// Added last so the database's own enum order is left alone. Where each
+  /// kind appears on a portfolio is set by ITEM_TYPES in portfolio-meta.ts.
+  EDUCATION
 }
 
 enum PortfolioVerification {

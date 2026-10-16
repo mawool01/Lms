@@ -415,6 +415,8 @@ async function main() {
       { userId: tRivera.id, type: "PUBLICATION", title: "What Students Say About Online Tutoring", organization: "Journal of College Reading and Learning", startDate: ymd("2024-03"), url: "https://example.org/article", position: 0 },
       { userId: tRivera.id, type: "SERVICE", title: "Certification Review Committee", organization: "ICLCA", role: "Reviewer", startDate: ymd("2023-01"), current: true, position: 0 },
       { userId: tRivera.id, type: "PROFESSIONAL_DEVELOPMENT", title: "CRLA Tutor Training Workshop", organization: "CRLA", startDate: ymd("2025-06"), hours: 12, position: 0 },
+      { userId: tRivera.id, type: "EDUCATION", title: "M.Ed.", organization: "State University", role: "Higher Education Administration", startDate: ymd("2011-08"), endDate: ymd("2013-05"), position: 0 },
+      { userId: tRivera.id, type: "EDUCATION", title: "B.A.", organization: "Riverside College", role: "Psychology", startDate: ymd("2007-08"), endDate: ymd("2011-05"), position: 1 },
     ],
   });
 

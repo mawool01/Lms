@@ -81,7 +81,7 @@ export function PortfolioItemForm({
       <input type="hidden" name="type" value={type} />
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="field sm:col-span-2">
-          <label>{type === "POSITION" ? "Job title" : "Title"}</label>
+          <label>{type === "POSITION" ? "Job title" : type === "EDUCATION" ? "Degree or credential" : "Title"}</label>
           <input name="title" defaultValue={values?.title} placeholder={meta.placeholderTitle} required />
         </div>
         <div className="field">
@@ -91,7 +91,7 @@ export function PortfolioItemForm({
         {meta.role ? (
           <div className="field">
             <label>{meta.role}</label>
-            <input name="role" defaultValue={values?.role ?? ""} placeholder="e.g. Chair, Member, Reviewer" />
+            <input name="role" defaultValue={values?.role ?? ""} placeholder={meta.rolePlaceholder} />
           </div>
         ) : (
           <div className="field">
@@ -108,7 +108,7 @@ export function PortfolioItemForm({
             <label>End</label>
             <input name="endDate" type="month" defaultValue={month(values?.endDate ?? null)} disabled={current} />
             <label className="mt-1 flex items-center gap-2 text-xs font-normal">
-              <input type="checkbox" name="current" checked={current} onChange={(e) => setCurrent(e.target.checked)} /> I currently hold this role
+              <input type="checkbox" name="current" checked={current} onChange={(e) => setCurrent(e.target.checked)} /> {meta.currentLabel}
             </label>
           </div>
         )}

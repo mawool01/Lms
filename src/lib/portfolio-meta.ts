@@ -7,7 +7,21 @@ export const ITEM_TYPES = {
     org: "Employer / institution",
     role: null,
     dates: "range",
+    currentLabel: "I currently hold this role",
     placeholderTitle: "Director of Tutoring Services",
+  },
+  EDUCATION: {
+    label: "Education",
+    singular: "Degree",
+    icon: "🎓",
+    org: "College / university",
+    // Degrees are often written without the subject ("B.S.", "Ed.D."), so the
+    // subject gets its own field rather than being buried in the title.
+    role: "Field of study",
+    rolePlaceholder: "e.g. Curriculum & Instruction",
+    dates: "range",
+    currentLabel: "I'm still studying here",
+    placeholderTitle: "M.Ed.",
   },
   PRESENTATION: {
     label: "Presentations",
@@ -33,7 +47,9 @@ export const ITEM_TYPES = {
     icon: "🤝",
     org: "Organization / committee",
     role: "Role",
+    rolePlaceholder: "e.g. Chair, Member, Reviewer",
     dates: "range",
+    currentLabel: "I currently hold this role",
     placeholderTitle: "ICLCA Conference Committee",
   },
   AWARD: {
