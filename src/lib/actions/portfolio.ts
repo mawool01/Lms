@@ -99,6 +99,10 @@ export async function savePortfolioItem(itemId: string | null, _prev: ActionResu
     files,
     hours,
     collaborators: optional(formData.get("collaborators"), 500),
+    // Short free text, not numbers: volumes and issues are written "12A",
+    // "3-4" for a double issue, and occasionally with a season or supplement.
+    volume: optional(formData.get("volume"), 40),
+    issue: optional(formData.get("issue"), 40),
   };
 
   if (itemId) {

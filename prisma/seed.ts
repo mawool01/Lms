@@ -412,7 +412,7 @@ async function main() {
       { userId: tRivera.id, type: "POSITION", title: "Director, Academic Success Center", organization: "ICLCA Demo College", startDate: ymd("2019-08"), current: true, position: 0 },
       { userId: tRivera.id, type: "POSITION", title: "Tutoring Coordinator", organization: "Riverside Community College", startDate: ymd("2014-01"), endDate: ymd("2019-07"), position: 1 },
       { userId: tRivera.id, type: "PRESENTATION", title: "Scaling Peer Tutoring Without Losing Quality", organization: "ICLCA Annual Conference", location: "Chicago, IL", startDate: ymd("2025-10"), collaborators: "D. Chen", verification: "VERIFIED", verifiedById: admin.id, verifiedAt: daysAgo(30), position: 0 },
-      { userId: tRivera.id, type: "PUBLICATION", title: "What Students Say About Online Tutoring", organization: "Journal of College Reading and Learning", startDate: ymd("2024-03"), url: "https://example.org/article", position: 0 },
+      { userId: tRivera.id, type: "PUBLICATION", title: "What Students Say About Online Tutoring", organization: "Journal of College Reading and Learning", volume: "54", issue: "2", startDate: ymd("2024-03"), url: "https://example.org/article", position: 0 },
       { userId: tRivera.id, type: "SERVICE", title: "Certification Review Committee", organization: "ICLCA", role: "Reviewer", startDate: ymd("2023-01"), current: true, position: 0 },
       { userId: tRivera.id, type: "PROFESSIONAL_DEVELOPMENT", title: "CRLA Tutor Training Workshop", organization: "CRLA", startDate: ymd("2025-06"), hours: 12, position: 0 },
       { userId: tRivera.id, type: "EDUCATION", title: "M.Ed.", organization: "State University", role: "Higher Education Administration", startDate: ymd("2011-08"), endDate: ymd("2013-05"), position: 0 },

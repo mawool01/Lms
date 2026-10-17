@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { blobClientConfig } from "@/lib/blob";
 import { completedCourses, ensurePortfolioSlug, portfolioUrl } from "@/lib/portfolio";
-import { ITEM_TYPES, ITEM_TYPE_ORDER, VISIBILITY_LABELS, itemDates } from "@/lib/portfolio-meta";
+import { ITEM_TYPES, ITEM_TYPE_ORDER, VISIBILITY_LABELS, itemDates, volumeIssue } from "@/lib/portfolio-meta";
 import {
   deletePortfolioItem,
   movePortfolioItem,
@@ -76,7 +76,7 @@ export default async function MyPortfolioPage() {
                           <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 p-3">
                             <div className="min-w-0 flex-1">
                               <p className="font-medium">{item.title}</p>
-                              <p className="muted text-xs">{[item.role, item.organization, itemDates(item, meta.dates), item.hours ? `${item.hours} h` : null].filter(Boolean).join(" · ")}</p>
+                              <p className="muted text-xs">{[item.role, item.organization, volumeIssue(item), itemDates(item, meta.dates), item.hours ? `${item.hours} h` : null].filter(Boolean).join(" · ")}</p>
                             </div>
                             {!item.visible && <Pill>Hidden</Pill>}
                             {VERIFICATION_PILLS[item.verification]}

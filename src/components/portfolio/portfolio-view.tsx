@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Portfolio } from "@/lib/portfolio";
-import { ITEM_TYPES, ITEM_TYPE_ORDER, itemDates } from "@/lib/portfolio-meta";
+import { ITEM_TYPES, ITEM_TYPE_ORDER, itemDates, volumeIssue } from "@/lib/portfolio-meta";
 import { certState, CERT_STATE_LABELS, evidenceName } from "@/lib/certifications/status";
 import { formatDate } from "@/lib/utils";
 import { Markdown } from "@/components/markdown";
@@ -101,7 +101,7 @@ export function PortfolioView({ p, org }: { p: Portfolio; org: string }) {
                         {item.url ? <a href={item.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{item.title}</a> : item.title}
                       </p>
                       <p className="text-sm text-slate-600 dark:text-slate-300">
-                        {[item.role, item.organization, item.location].filter(Boolean).join(" · ")}
+                        {[item.role, item.organization, volumeIssue(item), item.location].filter(Boolean).join(" · ")}
                       </p>
                       <p className="muted text-xs">
                         {[itemDates(item, meta.dates), item.hours ? `${item.hours} hours` : null, item.collaborators ? `with ${item.collaborators}` : null].filter(Boolean).join(" · ")}

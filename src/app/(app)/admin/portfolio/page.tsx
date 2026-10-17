@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { decideVerification } from "@/lib/actions/portfolio";
-import { ITEM_TYPES, itemDates } from "@/lib/portfolio-meta";
+import { ITEM_TYPES, itemDates, volumeIssue } from "@/lib/portfolio-meta";
 import { evidenceName } from "@/lib/certifications/status";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { Markdown } from "@/components/markdown";
@@ -55,7 +55,7 @@ export default async function PortfolioAdminPage({ searchParams }: { searchParam
                 </div>
                 <Pill>{meta.icon} {meta.singular}</Pill>
                 <p className="mt-2 font-semibold">{item.title}</p>
-                <p className="muted text-sm">{[item.role, item.organization, item.location, itemDates(item, meta.dates), item.hours ? `${item.hours} hours` : null, item.collaborators ? `with ${item.collaborators}` : null].filter(Boolean).join(" · ")}</p>
+                <p className="muted text-sm">{[item.role, item.organization, volumeIssue(item), item.location, itemDates(item, meta.dates), item.hours ? `${item.hours} hours` : null, item.collaborators ? `with ${item.collaborators}` : null].filter(Boolean).join(" · ")}</p>
                 {item.description && <div className="mt-2 text-sm"><Markdown>{item.description}</Markdown></div>}
                 <ul className="mt-2 space-y-1 text-sm">
                   {item.url && <li>🔗 <a href={item.url} target="_blank" rel="noopener noreferrer" className="link break-all">{item.url}</a></li>}

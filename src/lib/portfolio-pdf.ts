@@ -1,7 +1,7 @@
 import "server-only";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { Portfolio } from "./portfolio";
-import { ITEM_TYPES, ITEM_TYPE_ORDER, itemDates } from "./portfolio-meta";
+import { ITEM_TYPES, ITEM_TYPE_ORDER, itemDates, volumeIssue } from "./portfolio-meta";
 import { certState } from "./certifications/status";
 import { formatDate } from "./utils";
 import { pdfBranding } from "./pdf-branding";
@@ -109,7 +109,7 @@ export async function renderTranscriptPdf(p: Portfolio, url: string) {
     heading(hours ? `${meta.label} (${hours} hours)` : meta.label);
     for (const item of items) {
       text(item.title, { font: bold });
-      const details = [item.role, item.organization, item.location, itemDates(item, meta.dates), item.hours ? `${item.hours} hours` : null].filter(Boolean).join(" · ");
+      const details = [item.role, item.organization, volumeIssue(item), item.location, itemDates(item, meta.dates), item.hours ? `${item.hours} hours` : null].filter(Boolean).join(" · ");
       if (details) text(details, { indent: 10, size: 9, color: MUTED });
       if (item.description) text(plain(item.description).slice(0, 600), { indent: 10, size: 9 });
       text(tag(item.verification === "VERIFIED"), { indent: 10, size: 8, color: item.verification === "VERIFIED" ? GREEN : MUTED, gap: 8 });

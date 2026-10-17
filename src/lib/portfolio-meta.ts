@@ -88,6 +88,16 @@ export function formatMonth(d: Date | string | null | undefined) {
   return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(d));
 }
 
+/**
+ * "Vol. 12, No. 3" for a journal article. Either part may be missing — a
+ * journal that doesn't number its issues still has volumes, and vice versa —
+ * so each is labelled rather than relying on a "12(3)" shape that falls apart
+ * when one side is absent.
+ */
+export function volumeIssue(item: { volume?: string | null; issue?: string | null }) {
+  return [item.volume ? `Vol. ${item.volume}` : null, item.issue ? `No. ${item.issue}` : null].filter(Boolean).join(", ");
+}
+
 export function itemDates(item: { startDate: Date | string | null; endDate: Date | string | null; current: boolean }, mode: "range" | "single") {
   if (mode === "single") return formatMonth(item.startDate);
   const start = formatMonth(item.startDate);

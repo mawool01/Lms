@@ -20,6 +20,8 @@ type Values = {
   files: string[];
   hours: number | null;
   collaborators: string | null;
+  volume: string | null;
+  issue: string | null;
 };
 
 const month = (iso: string | null) => (iso ? iso.slice(0, 7) : "");
@@ -116,6 +118,21 @@ export function PortfolioItemForm({
           <div className="field">
             <label>Hours</label>
             <input name="hours" type="number" min={0} step="0.25" defaultValue={values?.hours ?? ""} />
+          </div>
+        )}
+        {type === "PUBLICATION" && (
+          // Kept in their own full-width row so the pair always sits together:
+          // dropped straight into the outer grid they'd be split across two
+          // rows, with Volume stranded beside the date.
+          <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
+            <div className="field">
+              <label>Volume <span className="muted font-normal">(optional)</span></label>
+              <input name="volume" defaultValue={values?.volume ?? ""} placeholder="e.g. 12" />
+            </div>
+            <div className="field">
+              <label>Issue <span className="muted font-normal">(optional)</span></label>
+              <input name="issue" defaultValue={values?.issue ?? ""} placeholder="e.g. 3" />
+            </div>
           </div>
         )}
         {(type === "PRESENTATION" || type === "PUBLICATION") && (

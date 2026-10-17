@@ -708,6 +708,8 @@ model PortfolioItem {
   files            String[]              @default([])
   hours            Float? // professional development hours
   collaborators    String?
+  volume           String? // journal volume, e.g. "12" or "12A"
+  issue            String? // journal issue, e.g. "3" or "3-4" for a double issue
   visible          Boolean               @default(true)
   position         Int                   @default(0)
   verification     PortfolioVerification @default(NONE)
