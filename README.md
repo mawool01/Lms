@@ -86,6 +86,7 @@ src/lib/wildapricot*.ts    Sign-on, admin API client, enrollment sync and its re
 src/components/            UI, lesson editor & renderer, charts, chat
 scripts/wa-dump.mjs        Dumps real Wild Apricot API payloads (read-only, needs an API key)
 scripts/wa-revocation-check.ts  Checks the sync's revocation rules (no database needed)
+scripts/portfolio-date-check.ts Checks portfolio date handling, incl. month-less dates
 ```
 
 ## Notes & next steps
@@ -96,6 +97,6 @@ scripts/wa-revocation-check.ts  Checks the sync's revocation rules (no database 
 - Course emails (announcements, grades) aren't sent yet; certification emails use Resend when configured.
 - Certification programs are seeded with placeholder requirements (Admin → Certifications → Programs & criteria → "Load ICLCA defaults"); edit them to match ICLCA's current official criteria.
 - Wild Apricot sync: **before relying on the removal side**, run `WILDAPRICOT_API_KEY=… node scripts/wa-dump.mjs <eventId>` against the real site. Two things aren't settled from the docs alone. Wild Apricot doesn't document its registration `Status` values, so `WA_INELIGIBLE_STATUSES` in `src/lib/wildapricot-rules.ts` ships empty — the dump shows whether a cancelled registration keeps a status or leaves the list altogether, which decides whether anything needs adding. And the contacts filter the **membership level** links use (`'Membership level ID' eq …`) is the one query not confirmed against a real tenant; if it's wrong those links report the error and revoke nobody, and the dump prints what the filter actually returns. Events and groups use documented endpoints. Granting access works either way.
-- `npx tsx scripts/wa-revocation-check.ts` checks the sync's removal rules without needing a database — worth running after touching `src/lib/wildapricot-rules.ts`. Likewise `npx tsx scripts/reorder-check.ts` for `src/lib/reorder.ts`, which decides whether a submitted drag-to-reorder order is allowed to move anything.
+- `npx tsx scripts/wa-revocation-check.ts` checks the sync's removal rules without needing a database — worth running after touching `src/lib/wildapricot-rules.ts`. Likewise `npx tsx scripts/reorder-check.ts` for `src/lib/reorder.ts`, which decides whether a submitted drag-to-reorder order is allowed to move anything, and `npx tsx scripts/portfolio-date-check.ts` for the date handling in `src/lib/portfolio-meta.ts` — portfolio dates may be recorded with or without a month, and a month-less date is stored on 1 January with a flag, so "2024" and "January 2024" must not be allowed to blur together.
 - Drag-to-reorder (portfolio items, modules, lessons, certification criteria, lesson blocks, rubric criteria) goes through `src/components/sortable-list.tsx`, built on [dnd-kit](https://dndkit.com) so it works with touch, mouse and keyboard. The ↑/↓ buttons are kept everywhere as a fallback. It adds about 17 kB to the first load of the pages that use it.
 - Vercel's Hobby plan allows only two cron jobs, and this feature uses the second.

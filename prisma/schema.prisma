@@ -702,6 +702,10 @@ model PortfolioItem {
   location         String?
   startDate        DateTime?
   endDate          DateTime?
+  // A date with no month is stored on the 1st of January and flagged here, so
+  // "2024" stays distinguishable from a genuine January 2024.
+  startYearOnly    Boolean               @default(false)
+  endYearOnly      Boolean               @default(false)
   current          Boolean               @default(false)
   description      String                @default("")
   url              String?

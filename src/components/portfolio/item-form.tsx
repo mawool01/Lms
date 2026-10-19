@@ -5,7 +5,7 @@ import { ActionForm, SubmitButton, type FormAction } from "@/components/forms";
 import { uploadToBlob } from "@/components/blob-upload";
 import type { BlobClientConfig } from "@/lib/blob-config";
 import { evidenceName } from "@/lib/certifications/status";
-import { ITEM_TYPES, type ItemType } from "@/lib/portfolio-meta";
+import { ITEM_TYPES, MONTHS, type ItemType } from "@/lib/portfolio-meta";
 
 type Values = {
   title: string;
@@ -14,6 +14,8 @@ type Values = {
   location: string | null;
   startDate: string | null; // ISO
   endDate: string | null;
+  startYearOnly: boolean;
+  endYearOnly: boolean;
   current: boolean;
   description: string;
   url: string | null;
@@ -24,7 +26,47 @@ type Values = {
   issue: string | null;
 };
 
-const month = (iso: string | null) => (iso ? iso.slice(0, 7) : "");
+/**
+ * A month-and-year picker where the month may be left out, for the many
+ * entries that are only known to the year — a journal that numbers issues
+ * rather than dating them, a degree remembered as "2013".
+ *
+ * Two plain controls rather than <input type="month">, which Firefox and
+ * Safari on the desktop don't implement and quietly render as a text box
+ * wanting "2024-03" typed into it.
+ */
+function MonthYear({ name, label, iso, yearOnly, disabled }: { name: "start" | "end"; label: string; iso: string | null; yearOnly: boolean; disabled?: boolean }) {
+  const d = iso ? new Date(iso) : null;
+  // A year-only date is stored on 1 January, so its month is not real and the
+  // picker must come back empty rather than claiming January.
+  const selectedMonth = d && !yearOnly ? String(d.getUTCMonth() + 1).padStart(2, "0") : "";
+  return (
+    <div className="flex gap-2">
+      <select name={`${name}Month`} defaultValue={selectedMonth} disabled={disabled} aria-label={`${label} month (optional)`} className="min-w-0 flex-1">
+        <option value="">Month (optional)</option>
+        {MONTHS.map((m, i) => (
+          <option key={m} value={String(i + 1).padStart(2, "0")}>
+            {m}
+          </option>
+        ))}
+      </select>
+      <input
+        name={`${name}Year`}
+        type="number"
+        min={1900}
+        max={2100}
+        step={1}
+        inputMode="numeric"
+        placeholder="Year"
+        defaultValue={d ? String(d.getUTCFullYear()) : ""}
+        disabled={disabled}
+        aria-label={`${label} year`}
+        className="w-24 shrink-0"
+      />
+    </div>
+  );
+}
+
 const ACCEPT = ".pdf,.ppt,.pptx,.key,.doc,.docx,.xls,.xlsx,.odp,.odt,.txt,.zip,image/*,audio/*,video/*";
 
 /** Add / edit form for one portfolio item. */
@@ -103,12 +145,12 @@ export function PortfolioItemForm({
         )}
         <div className="field">
           <label>{meta.dates === "range" ? "Start" : "Date"}</label>
-          <input name="startDate" type="month" defaultValue={month(values?.startDate ?? null)} />
+          <MonthYear name="start" label={meta.dates === "range" ? "Start" : "Date"} iso={values?.startDate ?? null} yearOnly={values?.startYearOnly ?? false} />
         </div>
         {meta.dates === "range" && (
           <div className="field">
             <label>End</label>
-            <input name="endDate" type="month" defaultValue={month(values?.endDate ?? null)} disabled={current} />
+            <MonthYear name="end" label="End" iso={values?.endDate ?? null} yearOnly={values?.endYearOnly ?? false} disabled={current} />
             <label className="mt-1 flex items-center gap-2 text-xs font-normal">
               <input type="checkbox" name="current" checked={current} onChange={(e) => setCurrent(e.target.checked)} /> {meta.currentLabel}
             </label>

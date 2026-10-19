@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { requireRole, requireUser } from "@/lib/auth";
 import { isSafeUrl } from "@/lib/blocks";
 import { appUrl, sendEmail } from "@/lib/certifications/email";
-import { ITEM_TYPES } from "@/lib/portfolio-meta";
+import { ITEM_TYPES, parseYearMonth } from "@/lib/portfolio-meta";
 import { slugProblem } from "@/lib/portfolio";
 import { nextPosition, orderUpdates } from "@/lib/reorder";
 import type { ActionResult } from "@/lib/action-types";
@@ -59,12 +59,6 @@ function isOwnPortfolioFile(url: string, userId: string) {
   return path.startsWith(`/files/portfolio/${userId}/`);
 }
 
-function parseMonth(value: string) {
-  if (!value) return null;
-  const d = new Date(/^\d{4}-\d{2}$/.test(value) ? `${value}-01T00:00:00Z` : value);
-  return Number.isNaN(d.getTime()) ? undefined : d;
-}
-
 export async function savePortfolioItem(itemId: string | null, _prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const user = await requireUser();
   const type = str(formData.get("type")) as PortfolioItemType;
@@ -76,11 +70,11 @@ export async function savePortfolioItem(itemId: string | null, _prev: ActionResu
   const files = [...new Set(formData.getAll("files").map((f) => String(f).trim()).filter(Boolean))];
   if (files.length > MAX_FILES) return { error: `You can attach up to ${MAX_FILES} files.` };
   if (files.some((f) => !isOwnPortfolioFile(f, user.id))) return { error: "One of the attached files couldn't be verified. Please upload it again." };
-  const startDate = parseMonth(str(formData.get("startDate")));
-  const endDate = parseMonth(str(formData.get("endDate")));
-  if (startDate === undefined || endDate === undefined) return { error: "Dates are invalid." };
+  const start = parseYearMonth(str(formData.get("startMonth")), str(formData.get("startYear")));
+  const end = parseYearMonth(str(formData.get("endMonth")), str(formData.get("endYear")));
+  if (!start || !end) return { error: "Please give a four-digit year between 1900 and 2100." };
   const current = formData.get("current") === "on";
-  if (startDate && endDate && !current && endDate < startDate) return { error: "The end date is before the start date." };
+  if (start.date && end.date && !current && end.date < start.date) return { error: "The end date is before the start date." };
   const hoursRaw = str(formData.get("hours"));
   const hours = hoursRaw ? Number(hoursRaw) : null;
   if (hours !== null && (!Number.isFinite(hours) || hours < 0 || hours > 10000)) return { error: "Hours must be a number between 0 and 10,000." };
@@ -91,8 +85,10 @@ export async function savePortfolioItem(itemId: string | null, _prev: ActionResu
     organization: optional(formData.get("organization")),
     role: optional(formData.get("role")),
     location: optional(formData.get("location")),
-    startDate,
-    endDate: current ? null : endDate,
+    startDate: start.date,
+    startYearOnly: start.yearOnly,
+    endDate: current ? null : end.date,
+    endYearOnly: current ? false : end.yearOnly,
     current,
     description: str(formData.get("description")).slice(0, 10000),
     url,

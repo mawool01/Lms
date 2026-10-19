@@ -83,9 +83,32 @@ export const VISIBILITY_LABELS = {
 
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
 
-export function formatMonth(d: Date | string | null | undefined) {
+export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/**
+ * Reads one date from the form's month and year boxes — the inverse of
+ * formatMonth. The month is optional, since plenty of entries are only known
+ * to the year, and a date without one is stored on 1 January with `yearOnly`
+ * set so it is never read back as a genuine January.
+ *
+ * Returns undefined for input that can't be made sense of, including a month
+ * chosen with no year: that is a half-filled form, and silently storing no
+ * date at all would throw the entry away without saying so.
+ */
+export function parseYearMonth(monthValue: string, yearValue: string): { date: Date | null; yearOnly: boolean } | undefined {
+  const year = yearValue.trim();
+  const month = monthValue.trim();
+  if (!year) return month ? undefined : { date: null, yearOnly: false };
+  if (!/^\d{4}$/.test(year) || Number(year) < 1900 || Number(year) > 2100) return undefined;
+  if (!/^(0[1-9]|1[0-2])$/.test(month) && month) return undefined;
+  return { date: new Date(`${year}-${month || "01"}-01T00:00:00Z`), yearOnly: !month };
+}
+
+/** "Mar 2024", or just "2024" for a date recorded without a month. */
+export function formatMonth(d: Date | string | null | undefined, yearOnly = false) {
   if (!d) return "";
-  return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(d));
+  const options: Intl.DateTimeFormatOptions = yearOnly ? { year: "numeric", timeZone: "UTC" } : { month: "short", year: "numeric", timeZone: "UTC" };
+  return new Intl.DateTimeFormat("en-US", options).format(new Date(d));
 }
 
 /**
@@ -98,9 +121,17 @@ export function volumeIssue(item: { volume?: string | null; issue?: string | nul
   return [item.volume ? `Vol. ${item.volume}` : null, item.issue ? `No. ${item.issue}` : null].filter(Boolean).join(", ");
 }
 
-export function itemDates(item: { startDate: Date | string | null; endDate: Date | string | null; current: boolean }, mode: "range" | "single") {
-  if (mode === "single") return formatMonth(item.startDate);
-  const start = formatMonth(item.startDate);
-  const end = item.current ? "Present" : formatMonth(item.endDate);
+/**
+ * Each end of a range carries its own precision, so "Aug 2011 – 2013" is
+ * sayable: people often know when they started and only the year they
+ * finished, and forcing a month on either end would invent detail.
+ */
+export function itemDates(
+  item: { startDate: Date | string | null; endDate: Date | string | null; current: boolean; startYearOnly?: boolean; endYearOnly?: boolean },
+  mode: "range" | "single",
+) {
+  if (mode === "single") return formatMonth(item.startDate, item.startYearOnly);
+  const start = formatMonth(item.startDate, item.startYearOnly);
+  const end = item.current ? "Present" : formatMonth(item.endDate, item.endYearOnly);
   return [start, end].filter(Boolean).join(" – ");
 }
