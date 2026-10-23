@@ -1,5 +1,8 @@
 import "server-only";
 import { brandingColors, getBranding } from "@/lib/branding";
+import { appUrl } from "@/lib/app-url";
+
+export { appUrl };
 
 /**
  * Optional email delivery through Resend (https://resend.com). Configure
@@ -7,13 +10,6 @@ import { brandingColors, getBranding } from "@/lib/branding";
  * Without them, emails are skipped and everything else still works.
  */
 export const emailEnabled = () => !!(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
-
-export function appUrl(path = "") {
-  const base =
-    process.env.APP_URL ??
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
-  return `${base.replace(/\/$/, "")}${path}`;
-}
 
 const escape = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 

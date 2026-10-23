@@ -3,8 +3,20 @@ import { unstable_cache } from "next/cache";
 import { db } from "./db";
 import { DEFAULT_BRANDING, type Branding } from "./branding-defaults";
 import { brandScale, scaleCss } from "./color";
+import { appUrl } from "./app-url";
 
 export { DEFAULT_BRANDING, type Branding };
+
+/** Private Blob URLs can't be opened by browsers; serve them through this app's /files route instead. */
+function servable(url: string | null) {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    return u.hostname.endsWith(".private.blob.vercel-storage.com") ? appUrl(`/files${u.pathname}`) : url;
+  } catch {
+    return url;
+  }
+}
 
 /** Site branding, cached until an admin saves changes (tag "branding"). */
 export const getBranding = unstable_cache(
@@ -20,8 +32,8 @@ export const getBranding = unstable_cache(
         loginMessage: row.loginMessage,
         primaryColor: row.primaryColor,
         accentColor: row.accentColor,
-        logoUrl: row.logoUrl,
-        faviconUrl: row.faviconUrl,
+        logoUrl: servable(row.logoUrl),
+        faviconUrl: servable(row.faviconUrl),
       };
     } catch {
       return DEFAULT_BRANDING; // e.g. before migrations have run

@@ -46,6 +46,8 @@ export async function uploadToBlob(
       throw first;
     }
   }
+  // A private store can accept an upload sent as "public", so trust the store's URL over the access we asked for.
+  if (new URL(blob.url).hostname.includes(".private.")) access = "private";
   const url = access === "private" ? `${window.location.origin}/files/${blob.pathname}` : blob.url;
   return { url, pathname: blob.pathname, access };
 }
