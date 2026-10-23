@@ -37,7 +37,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
     const file = await get(pathname, { access: "private", ...(range ? { headers: { Range: range } } : {}) }).catch(() => null);
     if (!file || file.statusCode !== 200) return new NextResponse("Not found", { status: 404 });
     if (file.blob.contentType) headers["Content-Type"] = file.blob.contentType;
-    for (const h of ["content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
+    // The SDK's fetch asks for gzip and decompresses the body but keeps the compressed content-length;
+    // forwarding that would cut the file short (broken images), so only pass it on for uncompressed responses.
+    const compressed = !!file.headers.get("content-encoding");
+    for (const h of [...(compressed ? [] : ["content-length"]), "content-range", "accept-ranges", "etag", "last-modified"]) {
       const v = file.headers.get(h);
       if (v) headers[h] = v;
     }
